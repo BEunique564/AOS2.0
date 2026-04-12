@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AOS - Angelic Organic Spark | Premium Natural Skincare</title>
+  <meta name="description" content="Premium organic skincare - AOS Face Pack & Scrubs. 100% natural, cruelty-free. Shop now!" />
+  <meta name="keywords" content="organic skincare, face pack, face scrub, AOS, Angelic Organic Spark, Lucknow" />
+  <meta property="og:title" content="AOS - Angelic Organic Spark" />
+  <meta property="og:description" content="Premium organic skincare crafted with nature's finest ingredients" />
+  <meta property="og:type" content="website" />
+
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <!-- Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <!-- Styles -->
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<!-- ========== HEADER ========== -->
+<header class="header" id="header">
+  <nav class="navbar">
+    <div class="nav-container">
+      <a href="#home" class="logo">
+        <img src="images/logo.png" alt="AOS Logo" class="logo-img" onerror="this.style.display='none'" />
+        <div class="logo-text">
+          <span class="brand-name">AOS</span>
+          <span class="brand-tagline">Angelic Organic Spark</span>
+        </div>
+      </a>
+
+      <ul class="nav-menu" id="navMenu">
+        <li><a href="#home" class="nav-link active">Home</a></li>
+        <li><a href="#products" class="nav-link">Products</a></li>
+        <li><a href="#about" class="nav-link">About</a></li>
+        <li><a href="#contact" class="nav-link">Contact</a></li>
+        <li>
+          <button class="cart-btn" id="cartBtn" aria-label="Shopping Cart">
+            <i class="fas fa-shopping-bag"></i>
+            <span class="cart-badge" id="cartCount">0</span>
+          </button>
+        </li>
+      </ul>
+
+      <button class="hamburger" id="hamburger" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+</header>
+
+<!-- ========== HERO ========== -->
+<section id="home" class="hero">
+  <div class="hero-bg-pattern"></div>
+  <div class="container">
+    <div class="hero-content">
+      <div class="hero-text">
+        <span class="hero-badge">🌿 100% Organic & Natural</span>
+        <h1 class="hero-title">
+          Discover Your<br />
+          <span class="text-gold">Natural Radiance</span>
+        </h1>
+        <p class="hero-subtitle">
+          Premium organic skincare crafted with Ayurvedic wisdom and
+          nature's finest ingredients. No chemicals, only pure goodness.
+        </p>
+        <div class="hero-actions">
+          <button class="btn-primary" onclick="scrollToProducts()">
+            <i class="fas fa-shopping-bag"></i> Shop Collection
+          </button>
+          <a href="#about" class="btn-outline">Learn More</a>
+        </div>
+        <div class="hero-trust">
+          <div class="trust-item"><i class="fas fa-leaf"></i> Chemical Free</div>
+          <div class="trust-item"><i class="fas fa-heart"></i> Cruelty Free</div>
+          <div class="trust-item"><i class="fas fa-truck"></i> Fast Delivery</div>
+        </div>
+      </div>
+      <div class="hero-visual">
+        <div class="hero-img-wrapper">
+          <img src="images/multiple.png" alt="AOS Premium Skincare Products"
+               onerror="this.parentElement.innerHTML='<div class=\'hero-img-placeholder\'><i class=\'fas fa-spa\'></i></div>'" />
+          <div class="hero-float-badge top-right">
+            <span class="float-num">5★</span>
+            <span class="float-txt">Customer Rating</span>
+          </div>
+          <div class="hero-float-badge bottom-left">
+            <span class="float-num">100%</span>
+            <span class="float-txt">Organic</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== MARQUEE STRIP ========== -->
+<div class="marquee-strip">
+  <div class="marquee-inner">
+    <span>🌿 Free Shipping on orders ₹499+</span>
+    <span>✨ 100% Natural Ingredients</span>
+    <span>📦 3-5 Day Delivery</span>
+    <span>💚 Cruelty Free</span>
+    <span>🔒 Secure Payment</span>
+    <span>🌿 Free Shipping on orders ₹499+</span>
+    <span>✨ 100% Natural Ingredients</span>
+    <span>📦 3-5 Day Delivery</span>
+    <span>💚 Cruelty Free</span>
+    <span>🔒 Secure Payment</span>
+  </div>
+</div>
+
+<!-- ========== PRODUCTS ========== -->
+<section id="products" class="products-section">
+  <div class="container">
+    <div class="section-header">
+      <span class="section-badge">Our Collection</span>
+      <h2 class="section-title">Premium Skincare Range</h2>
+      <p class="section-subtitle">Handcrafted with love, powered by nature</p>
+    </div>
+
+    <!-- Filter Tabs -->
+    <div class="filter-tabs">
+      <button class="filter-tab active" data-filter="all">All Products</button>
+      <button class="filter-tab" data-filter="face-pack">Face Packs</button>
+      <button class="filter-tab" data-filter="scrub">Scrubs</button>
+      <!-- 
+        FUTURE CATEGORY TABS:
+        <button class="filter-tab" data-filter="serum">Serums</button>
+        <button class="filter-tab" data-filter="moisturizer">Moisturizers</button>
+        <button class="filter-tab" data-filter="toner">Toners</button>
+      -->
+    </div>
+
+    <div class="products-grid" id="productsGrid">
+      <!-- Products loaded by JS -->
+    </div>
+  </div>
+</section>
+
+<!-- ========== ABOUT ========== -->
+<section id="about" class="about-section">
+  <div class="container">
+    <div class="about-grid">
+      <div class="about-visual">
+        <div class="about-img-stack">
+          <img src="images/steps.png" alt="How AOS Works"
+               onerror="this.parentElement.innerHTML='<div class=\'about-img-placeholder\'><i class=\'fas fa-seedling\'></i><p>Pure. Natural. Effective.</p></div>'" />
+        </div>
+        <div class="about-stats">
+          <div class="stat-card"><span class="stat-num">100%</span><span class="stat-label">Organic</span></div>
+          <div class="stat-card"><span class="stat-num">0</span><span class="stat-label">Chemicals</span></div>
+          <div class="stat-card"><span class="stat-num">5★</span><span class="stat-label">Rated</span></div>
+        </div>
+      </div>
+
+      <div class="about-content">
+        <span class="section-badge">Our Story</span>
+        <h2 class="section-title" style="text-align:left;">Angelic Organic<br /><span class="text-gold">Spark</span></h2>
+        <p class="about-text">
+          AOS was born from a simple belief — <strong>your skin deserves the best of nature.</strong>
+          We blend ancient Ayurvedic wisdom with modern skincare science to create products
+          that truly transform your skin, naturally.
+        </p>
+        <p class="about-text">
+          Every ingredient is carefully sourced, every formula lovingly crafted.
+          No harmful chemicals, no shortcuts — just pure, effective skincare.
+        </p>
+
+        <div class="features-grid">
+          <div class="feature-card">
+            <div class="feature-icon"><i class="fas fa-leaf"></i></div>
+            <div>
+              <h4>100% Organic</h4>
+              <p>Natural ingredients, responsibly sourced</p>
+            </div>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon"><i class="fas fa-heart"></i></div>
+            <div>
+              <h4>Cruelty-Free</h4>
+              <p>Never tested on animals, ever</p>
+            </div>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon"><i class="fas fa-flask"></i></div>
+            <div>
+              <h4>No Parabens</h4>
+              <p>Clean formulas, zero nasties</p>
+            </div>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon"><i class="fas fa-award"></i></div>
+            <div>
+              <h4>Premium Quality</h4>
+              <p>Luxury skincare, affordable price</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== HOW IT WORKS ========== -->
+<section class="how-section">
+  <div class="container">
+    <div class="section-header">
+      <span class="section-badge">Simple Steps</span>
+      <h2 class="section-title">How to Use</h2>
+    </div>
+    <div class="steps-grid">
+      <div class="step-card">
+        <div class="step-num">01</div>
+        <div class="step-icon"><i class="fas fa-tint"></i></div>
+        <h4>Cleanse</h4>
+        <p>Apna face pehle acchi tarah se clean karein</p>
+      </div>
+      <div class="step-card">
+        <div class="step-num">02</div>
+        <div class="step-icon"><i class="fas fa-hand-sparkles"></i></div>
+        <h4>Apply</h4>
+        <p>Pack ya scrub apply karein evenly</p>
+      </div>
+      <div class="step-card">
+        <div class="step-num">03</div>
+        <div class="step-icon"><i class="fas fa-clock"></i></div>
+        <h4>Wait</h4>
+        <p>15-20 minute tak rakhen</p>
+      </div>
+      <div class="step-card">
+        <div class="step-num">04</div>
+        <div class="step-icon"><i class="fas fa-smile"></i></div>
+        <h4>Glow</h4>
+        <p>Wash off karein, glow enjoy karein!</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== TESTIMONIALS ========== -->
+<section class="testimonials-section">
+  <div class="container">
+    <div class="section-header">
+      <span class="section-badge">Reviews</span>
+      <h2 class="section-title">What Customers Say</h2>
+    </div>
+    <div class="testimonials-grid">
+      <div class="testimonial-card">
+        <div class="stars">★★★★★</div>
+        <p>"Ekdum kamaal product! Face glowing hai pehle se hi. Highly recommend!"</p>
+        <div class="reviewer"><strong>Priya S.</strong> <span>Lucknow</span></div>
+      </div>
+      <div class="testimonial-card">
+        <div class="stars">★★★★★</div>
+        <p>"Natural ingredients feel hota hai skin pe. No irritation, pure glow. Love it!"</p>
+        <div class="reviewer"><strong>Ananya M.</strong> <span>Delhi</span></div>
+      </div>
+      <div class="testimonial-card">
+        <div class="stars">★★★★★</div>
+        <p>"Meesho se order kiya tha, phir seedha site se liya. Quality top-notch!"</p>
+        <div class="reviewer"><strong>Sneha R.</strong> <span>Kanpur</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== CONTACT ========== -->
+<section id="contact" class="contact-section">
+  <div class="container">
+    <div class="section-header">
+      <span class="section-badge">Get In Touch</span>
+      <h2 class="section-title">We'd Love to Hear<br />from <span class="text-gold">You</span></h2>
+    </div>
+    <div class="contact-grid">
+      <div class="contact-info">
+        <div class="contact-card">
+          <div class="contact-item">
+            <div class="contact-icon"><i class="fas fa-envelope"></i></div>
+            <div>
+              <h4>Email</h4>
+              <a href="mailto:vaibhavgupta2542@gmail.com">vaibhavgupta2542@gmail.com</a>
+            </div>
+          </div>
+          <div class="contact-item">
+            <div class="contact-icon"><i class="fab fa-whatsapp"></i></div>
+            <div>
+              <h4>WhatsApp</h4>
+              <a href="https://wa.me/919919917791" target="_blank">+91 99199 17791</a>
+            </div>
+          </div>
+          <div class="contact-item">
+            <div class="contact-icon"><i class="fas fa-map-marker-alt"></i></div>
+            <div>
+              <h4>Location</h4>
+              <p>Coming Soon - Hazratganj, Lucknow</p>
+            </div>
+          </div>
+          <div class="contact-item">
+            <div class="contact-icon"><i class="fas fa-clock"></i></div>
+            <div>
+              <h4>Hours</h4>
+              <p>Mon-Sat: 10AM - 7PM</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <form class="contact-form" id="contactForm">
+        <div class="form-row">
+          <div class="form-field">
+            <label>Your Name *</label>
+            <input type="text" name="name" placeholder="Aapka naam" required />
+          </div>
+          <div class="form-field">
+            <label>Phone</label>
+            <input type="tel" name="phone" placeholder="+91 XXXXX XXXXX" />
+          </div>
+        </div>
+        <div class="form-field">
+          <label>Email *</label>
+          <input type="email" name="email" placeholder="your@email.com" required />
+        </div>
+        <div class="form-field">
+          <label>Message *</label>
+          <textarea name="message" placeholder="Aapka message..." rows="5" required></textarea>
+        </div>
+        <button type="submit" class="btn-primary" style="width:100%">
+          <i class="fas fa-paper-plane"></i> Send Message
+        </button>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- ========== FOOTER ========== -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div class="footer-logo">
+          <span class="brand-name" style="font-size:1.5rem;">AOS</span>
+        </div>
+        <p>Premium organic skincare, crafted with Ayurvedic wisdom and nature's finest ingredients.</p>
+        <div class="social-links">
+          <a href="#" aria-label="Instagram"><i class="fab fa-instagram"></i></a>
+          <a href="#" aria-label="Facebook"><i class="fab fa-facebook"></i></a>
+          <a href="https://wa.me/919919917791" aria-label="WhatsApp"><i class="fab fa-whatsapp"></i></a>
+        </div>
+      </div>
+      <div class="footer-col">
+        <h4>Quick Links</h4>
+        <ul>
+          <li><a href="#home">Home</a></li>
+          <li><a href="#products">Products</a></li>
+          <li><a href="#about">About Us</a></li>
+          <li><a href="#contact">Contact</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Products</h4>
+        <ul>
+          <li><a href="#products">Face Pack 100G</a></li>
+          <li><a href="#products">Face Pack 50G</a></li>
+          <li><a href="#products">Face Pack 30G</a></li>
+          <li><a href="#products">Face Scrub</a></li>
+          <!-- FUTURE PRODUCTS: Serum, Moisturizer, Toner -->
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Policies</h4>
+        <ul>
+          <li><a href="#" onclick="showPolicy('shipping')">Shipping Policy</a></li>
+          <li><a href="#" onclick="showPolicy('return')">Return Policy</a></li>
+          <li><a href="#" onclick="showPolicy('privacy')">Privacy Policy</a></li>
+          <li><a href="#" onclick="showPolicy('terms')">Terms of Service</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>© 2025 Angelic Organic Spark. All rights reserved.</p>
+      <p>Made with ❤️ in Lucknow, India</p>
+    </div>
+  </div>
+</footer>
+
+<!-- ========== CART DRAWER ========== -->
+<div class="drawer-overlay" id="cartOverlay"></div>
+<div class="cart-drawer" id="cartDrawer">
+  <div class="drawer-header">
+    <h3>🛍️ Shopping Cart</h3>
+    <button class="drawer-close" id="closeCart"><i class="fas fa-times"></i></button>
+  </div>
+  <div class="drawer-body">
+    <div id="cartItems" class="cart-items-list">
+      <!-- Cart items injected by JS -->
+    </div>
+  </div>
+  <div class="drawer-footer" id="cartFooter" style="display:none">
+    <div class="cart-summary">
+      <div class="summary-row">
+        <span>Subtotal</span><span id="cartSubtotal">₹0</span>
+      </div>
+      <div class="summary-row shipping-row">
+        <span>Shipping</span><span id="cartShipping">₹50</span>
+      </div>
+      <div class="summary-row total-row">
+        <strong>Total</strong><strong id="cartTotal">₹0</strong>
+      </div>
+    </div>
+    <button class="btn-primary" style="width:100%" onclick="openCheckout()">
+      Proceed to Checkout <i class="fas fa-arrow-right"></i>
+    </button>
+  </div>
+</div>
+
+<!-- ========== CHECKOUT MODAL ========== -->
+<div class="modal-overlay" id="checkoutOverlay">
+  <div class="modal-box checkout-modal">
+    <div class="modal-header">
+      <h3>Secure Checkout</h3>
+      <button class="modal-close" onclick="closeCheckout()"><i class="fas fa-times"></i></button>
+    </div>
+
+    <!-- Progress Steps -->
+    <div class="checkout-steps">
+      <div class="step active" id="step1Btn">
+        <span class="step-circle">1</span><span>Details</span>
+      </div>
+      <div class="step-line"></div>
+      <div class="step" id="step2Btn">
+        <span class="step-circle">2</span><span>Verify</span>
+      </div>
+      <div class="step-line"></div>
+      <div class="step" id="step3Btn">
+        <span class="step-circle">3</span><span>Payment</span>
+      </div>
+    </div>
+
+    <!-- STEP 1: Customer Details -->
+    <div id="checkoutStep1" class="checkout-step active">
+      <form id="detailsForm">
+        <h4 class="step-title">📦 Delivery Information</h4>
+        <div class="form-row">
+          <div class="form-field">
+            <label>First Name *</label>
+            <!-- Apna pehla naam daalo -->
+            <input type="text" id="firstName" placeholder="Rahul" required />
+          </div>
+          <div class="form-field">
+            <label>Last Name *</label>
+            <!-- Family name / surname -->
+            <input type="text" id="lastName" placeholder="Sharma" required />
+          </div>
+        </div>
+        <div class="form-field">
+          <label>Email *</label>
+          <!-- Order confirmation email aayega yahan -->
+          <input type="email" id="custEmail" placeholder="rahul@email.com" required />
+        </div>
+        <div class="form-field">
+          <label>WhatsApp Number * <span class="hint">(OTP aayega)</span></label>
+          <!-- Yahan WhatsApp wala number daalo - OTP aayega -->
+          <div class="phone-input">
+            <span class="phone-prefix">+91</span>
+            <input type="tel" id="custPhone" placeholder="9876543210" maxlength="10" required />
+          </div>
+        </div>
+        <div class="form-field">
+          <label>Full Address *</label>
+          <!-- Ghar ka pura address - makaan number, gali, mohalla -->
+          <input type="text" id="custAddress" placeholder="House No., Street, Mohalla" required />
+        </div>
+        <div class="form-row">
+          <div class="form-field">
+            <label>City *</label>
+            <!-- Apna sheher -->
+            <input type="text" id="custCity" placeholder="Lucknow" required />
+          </div>
+          <div class="form-field">
+            <label>State</label>
+            <!-- State/Pradesh ka naam -->
+            <input type="text" id="custState" placeholder="Uttar Pradesh" value="Uttar Pradesh" />
+          </div>
+        </div>
+        <div class="form-field">
+          <label>PIN Code *</label>
+          <!-- 6 digit PIN code daalo -->
+          <input type="text" id="custZip" placeholder="226001" maxlength="6" required />
+        </div>
+        <button type="button" class="btn-primary" style="width:100%" onclick="goToStep2()">
+          Continue <i class="fas fa-arrow-right"></i>
+        </button>
+      </form>
+    </div>
+
+    <!-- STEP 2: OTP Verification -->
+    <div id="checkoutStep2" class="checkout-step">
+      <div class="otp-section">
+        <div class="otp-icon">📱</div>
+        <h4>WhatsApp OTP Verification</h4>
+        <p id="otpSentMsg">Aapke WhatsApp pe OTP bheja ja raha hai...</p>
+
+        <div class="otp-input-group">
+          <!-- 6 digit OTP jo WhatsApp pe aayega -->
+          <input type="text" id="otpInput" placeholder="6-digit OTP" maxlength="6"
+                 class="otp-input" inputmode="numeric" pattern="[0-9]*" />
+        </div>
+
+        <button class="btn-primary" style="width:100%;margin-top:1rem" onclick="verifyOTP()">
+          <i class="fas fa-shield-alt"></i> Verify OTP
+        </button>
+
+        <div class="otp-resend">
+          <span id="otpTimer">Resend in: <strong id="timerCount">60</strong>s</span>
+          <button class="resend-btn" id="resendBtn" onclick="resendOTP()" disabled>
+            Resend OTP
+          </button>
+        </div>
+
+        <!-- DEV NOTE: Production mein yeh div remove kar dena -->
+        <div id="devOtpHint" class="dev-hint" style="display:none">
+          Dev Mode OTP: <strong id="devOtpVal"></strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 3: Payment -->
+    <div id="checkoutStep3" class="checkout-step">
+      <h4 class="step-title">💳 Payment Method</h4>
+
+      <!-- Order Summary -->
+      <div class="order-summary-box">
+        <h5>Order Summary</h5>
+        <div id="checkoutItemsList"></div>
+        <div class="summary-divider"></div>
+        <div class="summary-row"><span>Subtotal</span><span id="checkoutSubtotal">₹0</span></div>
+        <div class="summary-row"><span>Shipping</span><span id="checkoutShipping">₹50</span></div>
+        <div class="summary-row total-row">
+          <strong>Total</strong><strong id="checkoutTotal">₹0</strong>
+        </div>
+      </div>
+
+      <!-- Payment Options -->
+      <div class="payment-options">
+        <label class="payment-option active" id="codOption">
+          <input type="radio" name="payment" value="COD" checked />
+          <div class="payment-opt-content">
+            <i class="fas fa-money-bill-wave"></i>
+            <div>
+              <strong>Cash on Delivery</strong>
+              <span>Delivery pe pay karein</span>
+            </div>
+          </div>
+          <div class="payment-check"><i class="fas fa-check-circle"></i></div>
+        </label>
+
+        <label class="payment-option" id="upiOption">
+          <input type="radio" name="payment" value="UPI" />
+          <div class="payment-opt-content">
+            <i class="fas fa-qrcode"></i>
+            <div>
+              <strong>UPI / QR Code</strong>
+              <span>PhonePe, GPay, Paytm</span>
+            </div>
+          </div>
+          <div class="payment-check"><i class="fas fa-check-circle"></i></div>
+        </label>
+      </div>
+
+      <!-- UPI QR (shown when UPI selected) -->
+      <div id="upiSection" style="display:none" class="upi-box">
+        <p>Neeche QR code scan karein:</p>
+        <img src="images/upiQRMAA.jpg" alt="UPI QR Code" class="upi-qr"
+             onerror="this.src='data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'200\' height=\'200\'><rect width=\'200\' height=\'200\' fill=\'%23f5f2e8\'/><text x=\'100\' y=\'100\' text-anchor=\'middle\' fill=\'%23d4af37\' font-size=\'14\'>QR Code</text></svg>'" />
+        <div class="upi-id">
+          <i class="fas fa-copy" onclick="copyUPI()"></i>
+          UPI ID: <strong id="upiIdText">paytmqr5x3t0n@ptys</strong>
+        </div>
+        <p class="upi-note">⚠️ Payment ke baad screenshot save kar lein</p>
+      </div>
+
+      <button class="btn-primary" style="width:100%;margin-top:1.5rem" id="placeOrderBtn" onclick="placeOrder()">
+        <i class="fas fa-lock"></i> Place Order Securely
+      </button>
+      <p class="secure-note"><i class="fas fa-shield-alt"></i> 100% Secure | OTP Verified</p>
+    </div>
+  </div>
+</div>
+
+<!-- ========== SUCCESS MODAL ========== -->
+<div class="modal-overlay" id="successOverlay">
+  <div class="modal-box success-modal">
+    <div class="success-animation">
+      <div class="success-circle">
+        <i class="fas fa-check"></i>
+      </div>
+    </div>
+    <h3>Order Placed! 🎉</h3>
+    <p>Bahut shukriya! Aapka order successfully place ho gaya.</p>
+    <div class="order-num-display">
+      Order # <strong id="successOrderNum">--</strong>
+    </div>
+    <p class="success-note">✅ WhatsApp pe confirmation bhej diya gaya hai<br/>📧 Email bhi check karein</p>
+    <button class="btn-primary" onclick="closeSuccess()">
+      Continue Shopping
+    </button>
+  </div>
+</div>
+
+<!-- ========== TOAST NOTIFICATION ========== -->
+<div class="toast" id="toast">
+  <i class="fas fa-check-circle" id="toastIcon"></i>
+  <span id="toastMsg">Added to cart!</span>
+</div>
+
+<!-- ========== BACK TO TOP ========== -->
+<button class="back-to-top" id="backToTop" onclick="window.scrollTo({top:0,behavior:'smooth'})" aria-label="Back to top">
+  <i class="fas fa-arrow-up"></i>
+</button>
+
+<!-- Script -->
+<script src="js/script.js"></script>
+</body>
+</html>

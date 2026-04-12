@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: aos-ecommerce-v2
+    env: node
+    region: singapore
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      # Baaki sab Render dashboard pe manually daalo:
+      # MONGODB_URI, JWT_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD,
+      # EMAIL_USER, EMAIL_PASS, STORE_EMAIL,
+      # TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, OWNER_WHATSAPP

@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AOS Admin Panel v2.0</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link rel="stylesheet" href="css/admin.css" />
+</head>
+<body>
+
+<!-- LOGIN PAGE -->
+<div id="loginPage" class="login-page">
+  <div class="login-card">
+    <div class="login-logo">
+      <span class="logo-aos">AOS</span>
+      <p>Admin Panel v2.0</p>
+    </div>
+    <h2>Welcome Back</h2>
+    <p class="login-sub">Apna admin email aur password daalo</p>
+
+    <div class="form-field">
+      <label><i class="fas fa-envelope"></i> Email</label>
+      <!-- Admin email yahan daalo - .env mein ADMIN_EMAIL -->
+      <input type="email" id="loginEmail" placeholder="admin@aos.com" autocomplete="username" />
+    </div>
+    <div class="form-field">
+      <label><i class="fas fa-lock"></i> Password</label>
+      <!-- Admin password - .env mein ADMIN_PASSWORD -->
+      <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password" />
+    </div>
+
+    <div id="loginError" class="login-error" style="display:none"></div>
+
+    <button class="login-btn" id="loginBtn" onclick="doLogin()">
+      <i class="fas fa-sign-in-alt"></i> Login
+    </button>
+    <a href="/" class="back-link"><i class="fas fa-arrow-left"></i> Back to Store</a>
+  </div>
+</div>
+
+<!-- ADMIN PANEL -->
+<div id="adminPanel" style="display:none">
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <span class="logo-aos">AOS</span>
+      <button class="sidebar-toggle" id="sidebarToggle"><i class="fas fa-bars"></i></button>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="#" class="nav-item active" data-section="dashboard" onclick="showSection('dashboard')">
+        <i class="fas fa-tachometer-alt"></i> <span>Dashboard</span>
+      </a>
+      <a href="#" class="nav-item" data-section="orders" onclick="showSection('orders')">
+        <i class="fas fa-shopping-bag"></i> <span>Orders</span>
+        <span class="nav-badge" id="pendingBadge">0</span>
+      </a>
+      <a href="#" class="nav-item" data-section="contacts" onclick="showSection('contacts')">
+        <i class="fas fa-envelope"></i> <span>Messages</span>
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="logout-btn" onclick="doLogout()">
+        <i class="fas fa-sign-out-alt"></i> <span>Logout</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <!-- Top Bar -->
+    <div class="topbar">
+      <h1 id="pageTitle">Dashboard</h1>
+      <div class="topbar-right">
+        <span id="adminEmailDisplay" class="admin-email"></span>
+        <button class="refresh-btn" onclick="refreshCurrent()">
+          <i class="fas fa-sync-alt"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- ===== DASHBOARD ===== -->
+    <section id="dashboardSection" class="content-section active">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon blue"><i class="fas fa-shopping-bag"></i></div>
+          <div class="stat-info">
+            <span class="stat-num" id="statTotal">—</span>
+            <span class="stat-label">Total Orders</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon amber"><i class="fas fa-clock"></i></div>
+          <div class="stat-info">
+            <span class="stat-num" id="statPending">—</span>
+            <span class="stat-label">Pending</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon green"><i class="fas fa-rupee-sign"></i></div>
+          <div class="stat-info">
+            <span class="stat-num" id="statRevenue">—</span>
+            <span class="stat-label">Total Revenue</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon purple"><i class="fas fa-calendar-day"></i></div>
+          <div class="stat-info">
+            <span class="stat-num" id="statToday">—</span>
+            <span class="stat-label">Today's Orders</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="recent-orders">
+        <div class="section-title-bar">
+          <h3>Recent Orders</h3>
+          <button class="view-all-btn" onclick="showSection('orders')">View All</button>
+        </div>
+        <div id="recentOrdersList"></div>
+      </div>
+    </section>
+
+    <!-- ===== ORDERS ===== -->
+    <section id="ordersSection" class="content-section">
+      <div class="orders-toolbar">
+        <div class="search-wrap">
+          <i class="fas fa-search"></i>
+          <!-- Order search: naam, phone, order number se search karo -->
+          <input type="text" id="orderSearch" placeholder="Search by name, phone, order#..." oninput="debounceSearch()" />
+        </div>
+        <div class="filter-wrap">
+          <!-- Status filter -->
+          <select id="statusFilter" onchange="loadOrders()">
+            <option value="all">All Status</option>
+            <option value="Pending">Pending</option>
+            <option value="Confirmed">Confirmed</option>
+            <option value="Processing">Processing</option>
+            <option value="Shipped">Shipped</option>
+            <option value="Delivered">Delivered</option>
+            <option value="Cancelled">Cancelled</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="orders-table-wrap">
+        <table class="orders-table">
+          <thead>
+            <tr>
+              <th>Order #</th>
+              <th>Customer</th>
+              <th>Items</th>
+              <th>Total</th>
+              <th>Payment</th>
+              <th>Status</th>
+              <th>Date</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="ordersTableBody">
+            <tr><td colspan="8" class="loading-row"><div class="spinner-admin"></div> Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pagination" id="ordersPagination"></div>
+    </section>
+
+    <!-- ===== CONTACTS ===== -->
+    <section id="contactsSection" class="content-section">
+      <div id="contactsList" class="contacts-list"></div>
+    </section>
+  </main>
+</div>
+
+<!-- ORDER DETAIL MODAL -->
+<div class="admin-modal-overlay" id="orderDetailOverlay" onclick="if(event.target===this)closeOrderDetail()">
+  <div class="admin-modal">
+    <div class="admin-modal-header">
+      <h3 id="orderDetailTitle">Order Details</h3>
+      <button onclick="closeOrderDetail()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="admin-modal-body" id="orderDetailBody"></div>
+    <div class="admin-modal-footer">
+      <label style="font-size:.85rem;font-weight:600;">Update Status:</label>
+      <select id="statusUpdateSelect">
+        <option value="Pending">Pending</option>
+        <option value="Confirmed">Confirmed</option>
+        <option value="Processing">Processing</option>
+        <option value="Shipped">Shipped</option>
+        <option value="Delivered">Delivered</option>
+        <option value="Cancelled">Cancelled</option>
+      </select>
+      <button class="update-btn" id="updateStatusBtn" onclick="updateOrderStatus()">
+        <i class="fas fa-save"></i> Update Status
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="admin-toast" id="adminToast"></div>
+
+<script src="js/admin.js"></script>
+</body>
+</html>
