@@ -1,5 +1,6 @@
 /**
  * AOS Admin Panel v2.0 - JavaScript
+ * ✅ FIXED: Saare onclick event delegation se replace kiye - CSP compatible
  */
 
 let TOKEN = localStorage.getItem("aos_admin_token") || "";
@@ -12,16 +13,73 @@ let searchDebounce = null;
 // ============================================
 document.addEventListener("DOMContentLoaded", () => {
   if (TOKEN) {
-    // Try to restore session
     showAdminPanel();
     loadDashboard();
   }
 
-  // Enter key on login
+  // ✅ Saare event listeners yahan — koi onclick nahi
+  setupAdminListeners();
+});
+
+// ============================================
+// ALL EVENT LISTENERS
+// ============================================
+function setupAdminListeners() {
+  // Login
   document.getElementById("loginPassword")?.addEventListener("keypress", (e) => {
     if (e.key === "Enter") doLogin();
   });
-});
+  document.getElementById("loginBtn")?.addEventListener("click", doLogin);
+  document.getElementById("logoutBtn")?.addEventListener("click", doLogout);
+
+  // Nav items
+  document.querySelectorAll(".nav-item").forEach(item => {
+    item.addEventListener("click", () => {
+      const section = item.dataset.section;
+      if (section) showSection(section);
+    });
+  });
+
+  // Refresh button
+  document.getElementById("refreshBtn")?.addEventListener("click", refreshCurrent);
+
+  // Order search + filter
+  document.getElementById("orderSearch")?.addEventListener("input", debounceSearch);
+  document.getElementById("statusFilter")?.addEventListener("change", () => loadOrders(1));
+
+  // Close order detail modal
+  document.getElementById("closeOrderDetail")?.addEventListener("click", closeOrderDetail);
+  document.getElementById("orderDetailOverlay")?.addEventListener("click", (e) => {
+    if (e.target === e.currentTarget) closeOrderDetail();
+  });
+
+  // Update status button
+  document.getElementById("updateStatusBtn")?.addEventListener("click", updateOrderStatus);
+
+  // ESC key
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeOrderDetail();
+  });
+
+  // ✅ Event delegation for dynamically rendered order rows & buttons
+  // Dashboard recent orders table
+  document.getElementById("recentOrdersList")?.addEventListener("click", (e) => {
+    const row = e.target.closest("tr[data-order-id]");
+    if (row) viewOrder(row.dataset.orderId);
+  });
+
+  // Orders table body - view buttons
+  document.getElementById("ordersTableBody")?.addEventListener("click", (e) => {
+    const btn = e.target.closest(".btn-view");
+    if (btn) viewOrder(btn.dataset.orderId);
+  });
+
+  // Pagination - event delegation on container
+  document.getElementById("ordersPagination")?.addEventListener("click", (e) => {
+    const btn = e.target.closest(".page-btn");
+    if (btn && btn.dataset.page) loadOrders(parseInt(btn.dataset.page));
+  });
+}
 
 // ============================================
 // AUTH
@@ -51,7 +109,8 @@ async function doLogin() {
     if (data.token) {
       TOKEN = data.token;
       localStorage.setItem("aos_admin_token", TOKEN);
-      document.getElementById("adminEmailDisplay").textContent = data.email || email;
+      const emailDisplay = document.getElementById("adminEmailDisplay");
+      if (emailDisplay) emailDisplay.textContent = data.email || email;
       showAdminPanel();
       loadDashboard();
     } else {
@@ -67,8 +126,7 @@ async function doLogin() {
 
 function showLoginError(msg) {
   const el = document.getElementById("loginError");
-  el.textContent = "❌ " + msg;
-  el.style.display = "block";
+  if (el) { el.textContent = "❌ " + msg; el.style.display = "block"; }
 }
 
 function doLogout() {
@@ -118,17 +176,22 @@ async function loadDashboard() {
       apiGet("/api/admin/orders?limit=5&page=1"),
     ]);
 
-    document.getElementById("statTotal").textContent = stats.totalOrders || 0;
-    document.getElementById("statPending").textContent = stats.pendingOrders || 0;
-    document.getElementById("statRevenue").textContent = "₹" + (stats.totalRevenue || 0).toFixed(0);
-    document.getElementById("statToday").textContent = stats.todayOrders || 0;
-
-    // Pending badge
+    const statTotal = document.getElementById("statTotal");
+    const statPending = document.getElementById("statPending");
+    const statRevenue = document.getElementById("statRevenue");
+    const statToday = document.getElementById("statToday");
     const badge = document.getElementById("pendingBadge");
-    badge.textContent = stats.pendingOrders || 0;
-    badge.style.display = stats.pendingOrders > 0 ? "inline" : "none";
 
-    // Recent orders
+    if (statTotal) statTotal.textContent = stats.totalOrders || 0;
+    if (statPending) statPending.textContent = stats.pendingOrders || 0;
+    if (statRevenue) statRevenue.textContent = "₹" + (stats.totalRevenue || 0).toFixed(0);
+    if (statToday) statToday.textContent = stats.todayOrders || 0;
+
+    if (badge) {
+      badge.textContent = stats.pendingOrders || 0;
+      badge.style.display = stats.pendingOrders > 0 ? "inline" : "none";
+    }
+
     renderRecentOrders(ordersData.orders || []);
   } catch (err) {
     console.error("Dashboard load error:", err);
@@ -144,6 +207,7 @@ function renderRecentOrders(orders) {
     return;
   }
 
+  // ✅ data-order-id attribute use kiya - onclick nahi
   container.innerHTML = `
     <table class="orders-table">
       <thead><tr>
@@ -151,11 +215,11 @@ function renderRecentOrders(orders) {
       </tr></thead>
       <tbody>
         ${orders.map(o => `
-          <tr style="cursor:pointer" onclick="viewOrder('${o._id}')">
+          <tr style="cursor:pointer" data-order-id="${o._id}">
             <td><span class="order-num">#${o.orderNumber}</span></td>
             <td>
-              <div class="customer-name">${o.customer?.firstName} ${o.customer?.lastName}</div>
-              <div class="customer-phone">${o.customer?.phone}</div>
+              <div class="customer-name">${o.customer?.firstName || ""} ${o.customer?.lastName || ""}</div>
+              <div class="customer-phone">${o.customer?.phone || ""}</div>
             </td>
             <td class="total-amt">₹${(o.total || 0).toFixed(0)}</td>
             <td><span class="status-badge s-${o.status}">${o.status}</span></td>
@@ -173,13 +237,16 @@ function renderRecentOrders(orders) {
 async function loadOrders(page = 1) {
   currentPage = page;
   const tbody = document.getElementById("ordersTableBody");
+  if (!tbody) return;
   tbody.innerHTML = '<tr><td colspan="8" class="loading-row"><div class="spinner-admin"></div> Loading...</td></tr>';
 
   const status = document.getElementById("statusFilter")?.value || "all";
   const search = document.getElementById("orderSearch")?.value || "";
 
   try {
-    const data = await apiGet(`/api/admin/orders?page=${page}&limit=15&status=${status}&search=${encodeURIComponent(search)}`);
+    const data = await apiGet(
+      `/api/admin/orders?page=${page}&limit=15&status=${status}&search=${encodeURIComponent(search)}`
+    );
     renderOrdersTable(data.orders || []);
     renderPagination(data.pages || 1, page);
   } catch (err) {
@@ -189,18 +256,20 @@ async function loadOrders(page = 1) {
 
 function renderOrdersTable(orders) {
   const tbody = document.getElementById("ordersTableBody");
+  if (!tbody) return;
 
   if (orders.length === 0) {
     tbody.innerHTML = '<tr><td colspan="8" class="loading-row">Koi orders nahi mili</td></tr>';
     return;
   }
 
+  // ✅ data-order-id attribute use kiya btn pe - onclick nahi
   tbody.innerHTML = orders.map(o => `
     <tr>
       <td><span class="order-num">#${o.orderNumber}</span></td>
       <td>
-        <div class="customer-name">${o.customer?.firstName} ${o.customer?.lastName}</div>
-        <div class="customer-phone">${o.customer?.phone}</div>
+        <div class="customer-name">${o.customer?.firstName || ""} ${o.customer?.lastName || ""}</div>
+        <div class="customer-phone">${o.customer?.phone || ""}</div>
       </td>
       <td class="items-count">${o.items?.length || 0} item(s)</td>
       <td class="total-amt">₹${(o.total || 0).toFixed(0)}</td>
@@ -208,7 +277,7 @@ function renderOrdersTable(orders) {
       <td><span class="status-badge s-${o.status}">${o.status}</span></td>
       <td>${formatDate(o.createdAt)}</td>
       <td>
-        <button class="action-btn btn-view" onclick="viewOrder('${o._id}')">
+        <button class="action-btn btn-view" data-order-id="${o._id}">
           <i class="fas fa-eye"></i> View
         </button>
       </td>
@@ -218,14 +287,20 @@ function renderOrdersTable(orders) {
 
 function renderPagination(totalPages, current) {
   const container = document.getElementById("ordersPagination");
-  if (!container || totalPages <= 1) { if (container) container.innerHTML = ""; return; }
+  if (!container || totalPages <= 1) {
+    if (container) container.innerHTML = "";
+    return;
+  }
 
   let html = "";
-  if (current > 1) html += `<button class="page-btn" onclick="loadOrders(${current - 1})">← Prev</button>`;
+  if (current > 1)
+    html += `<button class="page-btn" data-page="${current - 1}">← Prev</button>`;
   for (let i = 1; i <= totalPages; i++) {
-    html += `<button class="page-btn ${i === current ? "active" : ""}" onclick="loadOrders(${i})">${i}</button>`;
+    html += `<button class="page-btn ${i === current ? "active" : ""}" data-page="${i}">${i}</button>`;
   }
-  if (current < totalPages) html += `<button class="page-btn" onclick="loadOrders(${current + 1})">Next →</button>`;
+  if (current < totalPages)
+    html += `<button class="page-btn" data-page="${current + 1}">Next →</button>`;
+
   container.innerHTML = html;
 }
 
@@ -239,19 +314,22 @@ function debounceSearch() {
 // ============================================
 async function viewOrder(orderId) {
   currentOrderId = orderId;
-  document.getElementById("orderDetailOverlay").classList.add("open");
-
+  const overlay = document.getElementById("orderDetailOverlay");
   const body = document.getElementById("orderDetailBody");
+  if (!overlay || !body) return;
+
+  overlay.classList.add("open");
   body.innerHTML = '<div style="text-align:center;padding:2rem;"><div class="spinner-admin"></div></div>';
 
   try {
-    // Fetch single order from list (reuse the orders endpoint with search)
-    const data = await apiGet(`/api/admin/orders?search=${orderId}&limit=1`);
+    const data = await apiGet(`/api/admin/orders?search=${orderId}&limit=50`);
     const order = data.orders?.find(o => o._id === orderId);
     if (!order) { body.innerHTML = "<p>Order not found</p>"; return; }
 
-    document.getElementById("orderDetailTitle").textContent = `Order #${order.orderNumber}`;
-    document.getElementById("statusUpdateSelect").value = order.status;
+    const titleEl = document.getElementById("orderDetailTitle");
+    const statusSelect = document.getElementById("statusUpdateSelect");
+    if (titleEl) titleEl.textContent = `Order #${order.orderNumber}`;
+    if (statusSelect) statusSelect.value = order.status;
 
     const itemsHtml = (order.items || []).map(i => `
       <div class="order-item-row">
@@ -266,15 +344,15 @@ async function viewOrder(orderId) {
         <div class="detail-grid">
           <div class="detail-item">
             <span class="detail-label">Name</span>
-            <span class="detail-val">${order.customer?.firstName} ${order.customer?.lastName}</span>
+            <span class="detail-val">${order.customer?.firstName || ""} ${order.customer?.lastName || ""}</span>
           </div>
           <div class="detail-item">
             <span class="detail-label">Phone / WhatsApp</span>
-            <span class="detail-val">${order.customer?.phone}</span>
+            <span class="detail-val">${order.customer?.phone || ""}</span>
           </div>
           <div class="detail-item">
             <span class="detail-label">Email</span>
-            <span class="detail-val">${order.customer?.email}</span>
+            <span class="detail-val">${order.customer?.email || ""}</span>
           </div>
           <div class="detail-item">
             <span class="detail-label">OTP Verified</span>
@@ -286,8 +364,8 @@ async function viewOrder(orderId) {
       <div class="detail-section">
         <h4>Delivery Address</h4>
         <p style="font-size:.9rem;line-height:1.7;">
-          ${order.customer?.address}<br/>
-          ${order.customer?.city}, ${order.customer?.state} - ${order.customer?.zipCode}
+          ${order.customer?.address || ""}<br/>
+          ${order.customer?.city || ""}, ${order.customer?.state || ""} - ${order.customer?.zipCode || ""}
         </p>
       </div>
 
@@ -316,19 +394,23 @@ async function viewOrder(orderId) {
     `;
   } catch (err) {
     body.innerHTML = "<p style='color:red'>Error loading order details</p>";
+    console.error(err);
   }
 }
 
 function closeOrderDetail() {
-  document.getElementById("orderDetailOverlay").classList.remove("open");
+  const overlay = document.getElementById("orderDetailOverlay");
+  if (overlay) overlay.classList.remove("open");
   currentOrderId = null;
 }
 
 async function updateOrderStatus() {
   if (!currentOrderId) return;
 
-  const status = document.getElementById("statusUpdateSelect").value;
+  const status = document.getElementById("statusUpdateSelect")?.value;
   const btn = document.getElementById("updateStatusBtn");
+  if (!btn) return;
+
   btn.innerHTML = '<div class="spinner-admin"></div>';
   btn.disabled = true;
 
@@ -355,6 +437,7 @@ async function updateOrderStatus() {
 // ============================================
 async function loadContacts() {
   const container = document.getElementById("contactsList");
+  if (!container) return;
   container.innerHTML = '<div class="spinner-admin" style="display:block;margin:2rem auto;"></div>';
 
   try {
@@ -367,12 +450,12 @@ async function loadContacts() {
       <div class="contact-card">
         <div class="contact-card-header">
           <div>
-            <div class="contact-name">${c.name}</div>
+            <div class="contact-name">${c.name || ""}</div>
             <div class="contact-meta">${c.email || ""} ${c.phone ? "| " + c.phone : ""}</div>
           </div>
           <div class="contact-date">${formatDate(c.createdAt)}</div>
         </div>
-        <div class="contact-msg">${c.message}</div>
+        <div class="contact-msg">${c.message || ""}</div>
       </div>
     `).join("");
   } catch {
@@ -384,21 +467,18 @@ async function loadContacts() {
 // NAVIGATION
 // ============================================
 function showSection(name) {
-  // Sections
   ["dashboard", "orders", "contacts"].forEach(s => {
     document.getElementById(`${s}Section`)?.classList.remove("active");
   });
   document.getElementById(`${name}Section`)?.classList.add("active");
 
-  // Nav items
   document.querySelectorAll(".nav-item").forEach(i => i.classList.remove("active"));
   document.querySelector(`[data-section="${name}"]`)?.classList.add("active");
 
-  // Page title
   const titles = { dashboard: "Dashboard", orders: "Orders", contacts: "Messages" };
-  document.getElementById("pageTitle").textContent = titles[name] || name;
+  const pageTitle = document.getElementById("pageTitle");
+  if (pageTitle) pageTitle.textContent = titles[name] || name;
 
-  // Load data
   if (name === "orders") loadOrders(1);
   else if (name === "contacts") loadContacts();
   else if (name === "dashboard") loadDashboard();
@@ -416,14 +496,18 @@ function formatDate(iso, full = false) {
   if (!iso) return "—";
   const d = new Date(iso);
   if (full) {
-    return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) +
-      " " + d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+    return (
+      d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) +
+      " " +
+      d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })
+    );
   }
   return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 function showAdminToast(msg) {
   const toast = document.getElementById("adminToast");
+  if (!toast) return;
   toast.textContent = msg;
   toast.classList.add("show");
   setTimeout(() => toast.classList.remove("show"), 3000);
