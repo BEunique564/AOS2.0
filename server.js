@@ -1,7 +1,7 @@
 /**
  * AOS E-COMMERCE v2.0 - PRODUCTION SERVER
  * Angelic Organic Spark
- * Features: Orders, OTP Verification, WhatsApp Alerts, Admin Panel, Email
+ * ✅ FIXED: CSP mein script-src-attr add kiya - onclick attributes kaam karein
  */
 
 const express = require("express");
@@ -32,7 +32,6 @@ mongoose
   .then(() => console.log("✅ MongoDB Connected"))
   .catch((err) => {
     console.error("❌ MongoDB Error:", err.message);
-    // Don't crash server - orders will still work with localStorage fallback
   });
 
 // ============================================
@@ -40,7 +39,7 @@ mongoose
 // ============================================
 app.use(compression());
 
-// Helmet - security headers (CSP thoda relaxed for fonts/icons)
+// ✅ FIXED: CSP - script-src-attr add kiya taaki onclick kaam kare
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -52,8 +51,19 @@ app.use(
           "fonts.googleapis.com",
           "cdnjs.cloudflare.com",
         ],
-        fontSrc: ["'self'", "fonts.gstatic.com", "cdnjs.cloudflare.com"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "cdnjs.cloudflare.com"],
+        fontSrc: [
+          "'self'",
+          "fonts.gstatic.com",
+          "cdnjs.cloudflare.com",
+          "data:",
+        ],
+        scriptSrc: [
+          "'self'",
+          "'unsafe-inline'",
+          "cdnjs.cloudflare.com",
+        ],
+        // ✅ YEH LINE SABSE ZAROORI THI - onclick attributes allow karta hai
+        scriptSrcAttr: ["'unsafe-inline'"],
         imgSrc: ["'self'", "data:", "blob:", "https:"],
         connectSrc: ["'self'"],
       },
@@ -73,7 +83,7 @@ app.use(
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
-// Rate Limiting - General
+// Rate Limiting
 const limiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW) || 15 * 60 * 1000,
   max: parseInt(process.env.RATE_LIMIT_MAX) || 100,
@@ -83,7 +93,7 @@ const limiter = rateLimit({
 });
 app.use("/api/", limiter);
 
-// OTP Rate Limiting - Strict (5 requests per 15 min per IP)
+// OTP Rate Limiting
 const otpLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5,
@@ -94,7 +104,6 @@ const otpLimiter = rateLimit({
 // MONGOOSE SCHEMAS
 // ============================================
 
-// OTP Schema
 const otpSchema = new mongoose.Schema({
   phone: { type: String, required: true },
   otp: { type: String, required: true },
@@ -105,7 +114,6 @@ const otpSchema = new mongoose.Schema({
 });
 const OTP = mongoose.model("OTP", otpSchema);
 
-// Order Schema
 const orderSchema = new mongoose.Schema({
   orderNumber: { type: String, unique: true },
   customer: {
@@ -149,7 +157,6 @@ const orderSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now },
 });
 
-// Auto-generate order number
 orderSchema.pre("save", async function (next) {
   if (!this.orderNumber) {
     const count = await Order.countDocuments();
@@ -160,7 +167,6 @@ orderSchema.pre("save", async function (next) {
 });
 const Order = mongoose.model("Order", orderSchema);
 
-// Contact Schema
 const contactSchema = new mongoose.Schema({
   name: String,
   email: String,
@@ -171,7 +177,6 @@ const contactSchema = new mongoose.Schema({
 });
 const Contact = mongoose.model("Contact", contactSchema);
 
-// Admin Schema
 const adminSchema = new mongoose.Schema({
   email: { type: String, unique: true, lowercase: true },
   passwordHash: String,
@@ -204,7 +209,10 @@ if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
 // ============================================
 async function sendWhatsApp(to, message) {
   try {
-    if (!process.env.TWILIO_ACCOUNT_SID || process.env.TWILIO_ACCOUNT_SID.startsWith("AC_")) {
+    if (
+      !process.env.TWILIO_ACCOUNT_SID ||
+      process.env.TWILIO_ACCOUNT_SID.startsWith("AC_")
+    ) {
       console.log("📱 WhatsApp (mock):", message.substring(0, 60) + "...");
       return { success: false, reason: "Twilio not configured" };
     }
@@ -259,12 +267,10 @@ async function sendOrderEmailToCustomer(order) {
         <div style="padding:30px;">
           <h2 style="color:#3c2415;">🎉 Order Confirmed!</h2>
           <p style="color:#6b5b47;">Namaste ${order.customer.firstName}! Aapka order place ho gaya hai.</p>
-          
           <div style="background:#f5f2e8;border-radius:12px;padding:20px;margin:20px 0;">
             <p style="margin:0;color:#6b5b47;font-size:14px;">Order Number</p>
             <h3 style="margin:4px 0;color:#d4af37;font-size:22px;">#${order.orderNumber}</h3>
           </div>
-
           <table style="width:100%;border-collapse:collapse;margin:20px 0;">
             <thead>
               <tr style="background:#f5f2e8;">
@@ -275,11 +281,9 @@ async function sendOrderEmailToCustomer(order) {
             </thead>
             <tbody>${itemsHtml}</tbody>
           </table>
-
           <div style="text-align:right;padding:16px;background:#f5f2e8;border-radius:8px;">
             <strong style="color:#3c2415;font-size:18px;">Total: ₹${order.total.toFixed(2)}</strong>
           </div>
-
           <div style="margin:20px 0;padding:16px;border:2px solid #d4af37;border-radius:12px;">
             <h3 style="color:#3c2415;margin:0 0 10px;">📦 Delivery Address</h3>
             <p style="color:#6b5b47;margin:0;">
@@ -287,9 +291,8 @@ async function sendOrderEmailToCustomer(order) {
               ${order.customer.address}, ${order.customer.city} - ${order.customer.zipCode}
             </p>
           </div>
-
           <div style="background:#fff9e6;border:1px solid #d4af37;border-radius:8px;padding:16px;">
-            <p style="margin:0;color:#8b6914;">💡 <strong>Payment:</strong> ${order.paymentMethod === "COD" ? "Cash on Delivery - Delivery pe payment karein" : "UPI Payment"}</p>
+            <p style="margin:0;color:#8b6914;">💡 <strong>Payment:</strong> ${order.paymentMethod === "COD" ? "Cash on Delivery" : "UPI Payment"}</p>
           </div>
         </div>
         <div style="background:#3c2415;padding:20px;text-align:center;">
@@ -338,7 +341,7 @@ async function sendOrderAlertToAdmin(order) {
           <hr>
           <p><strong>Total:</strong> ₹${order.total.toFixed(2)}</p>
           <p><strong>Payment:</strong> ${order.paymentMethod}</p>
-          <a href="${process.env.CLIENT_URL}/admin.html" 
+          <a href="${process.env.CLIENT_URL}/admin.html"
              style="background:#d4af37;color:white;padding:10px 20px;border-radius:8px;text-decoration:none;">
             View in Admin Panel
           </a>
@@ -390,10 +393,8 @@ function authMiddleware(req, res, next) {
 }
 
 // ============================================
-// ===== API ROUTES =====
+// API ROUTES
 // ============================================
-
-// ----- OTP APIs -----
 
 // Send OTP
 app.post("/api/otp/send", otpLimiter, async (req, res) => {
@@ -406,32 +407,26 @@ app.post("/api/otp/send", otpLimiter, async (req, res) => {
       return res.status(400).json({ error: "Invalid phone number" });
     }
 
-    // Generate 6-digit OTP
     const otp = crypto.randomInt(100000, 999999).toString();
-    const expiresAt = new Date(Date.now() + (parseInt(process.env.OTP_EXPIRY_MINUTES) || 10) * 60 * 1000);
+    const expiresAt = new Date(
+      Date.now() + (parseInt(process.env.OTP_EXPIRY_MINUTES) || 10) * 60 * 1000
+    );
 
-    // Delete old OTPs for this phone
     await OTP.deleteMany({ phone: cleanPhone });
 
-    // Save new OTP (hashed for security)
     const otpHash = await bcrypt.hash(otp, 10);
     await OTP.create({ phone: cleanPhone, otp: otpHash, expiresAt });
 
-    // Send via WhatsApp
     const whatsappTo = `whatsapp:+91${cleanPhone.slice(-10)}`;
     const whatsappMsg = `🔐 *AOS Skincare - Order Verification*\n\nAapka OTP hai: *${otp}*\n\nYeh OTP ${process.env.OTP_EXPIRY_MINUTES || 10} minutes mein expire ho jayega.\n\n⚠️ Kisi ko bhi share mat karein.\n\n_Angelic Organic Spark_`;
 
     const waResult = await sendWhatsApp(whatsappTo, whatsappMsg);
-
-    // Also send via email if available (fallback)
-    // NOTE: Production mein sirf WhatsApp use karo
 
     console.log(`OTP for ${cleanPhone}: ${otp} (WhatsApp: ${waResult.success})`);
 
     res.json({
       success: true,
       message: "OTP sent successfully via WhatsApp",
-      // DEV ONLY - production mein yeh line hata dena:
       ...(process.env.NODE_ENV !== "production" && { devOtp: otp }),
     });
   } catch (err) {
@@ -469,7 +464,6 @@ app.post("/api/otp/verify", async (req, res) => {
 
     await OTP.updateOne({ _id: otpDoc._id }, { verified: true });
 
-    // Return a short-lived verification token
     const verifyToken = jwt.sign(
       { phone: cleanPhone, purpose: "order" },
       process.env.JWT_SECRET || "aos-secret",
@@ -483,19 +477,15 @@ app.post("/api/otp/verify", async (req, res) => {
   }
 });
 
-// ----- ORDER APIs -----
-
 // Place Order
 app.post("/api/order", async (req, res) => {
   try {
     const { customer, items, total, paymentMethod, verifyToken } = req.body;
 
-    // Validate required fields
     if (!customer || !items || !total) {
       return res.status(400).json({ error: "Order data incomplete" });
     }
 
-    // Verify OTP token
     let otpVerified = false;
     if (verifyToken) {
       try {
@@ -508,7 +498,6 @@ app.post("/api/order", async (req, res) => {
       return res.status(401).json({ error: "OTP verification required" });
     }
 
-    // Calculate totals server-side (client side totals trust nahi karo)
     const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
     const shipping = subtotal >= 499 ? 0 : 50;
     const calculatedTotal = subtotal + shipping;
@@ -525,21 +514,18 @@ app.post("/api/order", async (req, res) => {
 
     await order.save();
 
-    // Send notifications (async - don't wait)
     sendOrderEmailToCustomer(order).catch(console.error);
     sendOrderAlertToAdmin(order).catch(console.error);
 
-    // WhatsApp to customer
     const custPhone = `whatsapp:+91${customer.phone.replace(/\D/g, "").slice(-10)}`;
     const itemNames = items.map((i) => `${i.name} x${i.quantity}`).join(", ");
     const custMsg = `🌿 *AOS Skincare - Order Confirmed!*\n\nNamaste ${customer.firstName}! 🎉\n\n*Order #${order.orderNumber}*\n${itemNames}\n\n💰 *Total: ₹${calculatedTotal.toFixed(2)}*\n🚚 *Payment: ${paymentMethod === "COD" ? "Cash on Delivery" : "UPI"}*\n\nAapka order 3-5 business days mein deliver ho jayega.\n\nKoi sawaal? Call karein: +91 99199 17791\n\n_Angelic Organic Spark_ ✨`;
 
     sendWhatsApp(custPhone, custMsg).catch(console.error);
 
-    // WhatsApp to owner
     const ownerPhone = process.env.OWNER_WHATSAPP;
     if (ownerPhone) {
-      const ownerMsg = `🛍️ *Naya Order Aaya!*\n\n*Order #${order.orderNumber}*\nCustomer: ${customer.firstName} ${customer.lastName}\nPhone: ${customer.phone}\nCity: ${customer.city}\nItems: ${itemNames}\nTotal: ₹${calculatedTotal}\nPayment: ${paymentMethod}\n\nAdmin Panel dekhein: ${process.env.CLIENT_URL}/admin.html`;
+      const ownerMsg = `🛍️ *Naya Order Aaya!*\n\n*Order #${order.orderNumber}*\nCustomer: ${customer.firstName} ${customer.lastName}\nPhone: ${customer.phone}\nCity: ${customer.city}\nItems: ${itemNames}\nTotal: ₹${calculatedTotal}\nPayment: ${paymentMethod}\n\nAdmin Panel: ${process.env.CLIENT_URL}/admin.html`;
       sendWhatsApp(ownerPhone, ownerMsg).catch(console.error);
     }
 
@@ -554,7 +540,7 @@ app.post("/api/order", async (req, res) => {
   }
 });
 
-// ----- CONTACT API -----
+// Contact Form
 app.post("/api/contact", async (req, res) => {
   try {
     const { name, email, phone, message } = req.body;
@@ -562,7 +548,6 @@ app.post("/api/contact", async (req, res) => {
 
     await Contact.create({ name, email, phone, message });
 
-    // Email to admin
     if (transporter) {
       await transporter.sendMail({
         from: `"AOS Contact" <${process.env.EMAIL_USER}>`,
@@ -577,8 +562,6 @@ app.post("/api/contact", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
-// ----- ADMIN APIs -----
 
 // Admin Login
 app.post("/api/admin/login", async (req, res) => {
@@ -633,19 +616,20 @@ app.get("/api/admin/orders", authMiddleware, async (req, res) => {
   }
 });
 
-// Get Dashboard Stats
+// Dashboard Stats
 app.get("/api/admin/stats", authMiddleware, async (req, res) => {
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const [totalOrders, todayOrders, totalRevenue, pendingOrders, contacts] = await Promise.all([
-      Order.countDocuments(),
-      Order.countDocuments({ createdAt: { $gte: today } }),
-      Order.aggregate([{ $group: { _id: null, total: { $sum: "$total" } } }]),
-      Order.countDocuments({ status: "Pending" }),
-      Contact.countDocuments({ replied: false }),
-    ]);
+    const [totalOrders, todayOrders, totalRevenue, pendingOrders, contacts] =
+      await Promise.all([
+        Order.countDocuments(),
+        Order.countDocuments({ createdAt: { $gte: today } }),
+        Order.aggregate([{ $group: { _id: null, total: { $sum: "$total" } } }]),
+        Order.countDocuments({ status: "Pending" }),
+        Contact.countDocuments({ replied: false }),
+      ]);
 
     res.json({
       totalOrders,
@@ -663,7 +647,9 @@ app.get("/api/admin/stats", authMiddleware, async (req, res) => {
 app.put("/api/admin/order/:id", authMiddleware, async (req, res) => {
   try {
     const { status, notes } = req.body;
-    const validStatuses = ["Pending", "Confirmed", "Processing", "Shipped", "Delivered", "Cancelled"];
+    const validStatuses = [
+      "Pending", "Confirmed", "Processing", "Shipped", "Delivered", "Cancelled",
+    ];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ error: "Invalid status" });
     }
@@ -676,13 +662,12 @@ app.put("/api/admin/order/:id", authMiddleware, async (req, res) => {
 
     if (!order) return res.status(404).json({ error: "Order not found" });
 
-    // Notify customer on status change
     const custPhone = `whatsapp:+91${order.customer.phone.replace(/\D/g, "").slice(-10)}`;
     const statusEmoji = { Confirmed: "✅", Shipped: "🚚", Delivered: "🎉", Cancelled: "❌" };
     const emoji = statusEmoji[status] || "📦";
 
     if (["Confirmed", "Shipped", "Delivered", "Cancelled"].includes(status)) {
-      const statusMsg = `${emoji} *AOS Order Update*\n\nOrder #${order.orderNumber}\nStatus: *${status}*\n${status === "Shipped" ? "Aapka order raste mein hai! 3-5 din mein milega." : ""}\n${status === "Delivered" ? "Order deliver ho gaya! Feedback dein 🌟" : ""}\n${status === "Cancelled" ? "Agar koi sawal ho toh call karein: +91 99199 17791" : ""}\n\n_Angelic Organic Spark_ ✨`;
+      const statusMsg = `${emoji} *AOS Order Update*\n\nOrder #${order.orderNumber}\nStatus: *${status}*\n${status === "Shipped" ? "Aapka order raste mein hai!" : ""}\n${status === "Delivered" ? "Order deliver ho gaya! 🌟" : ""}\n${status === "Cancelled" ? "Call: +91 99199 17791" : ""}\n\n_Angelic Organic Spark_ ✨`;
       sendWhatsApp(custPhone, statusMsg).catch(console.error);
     }
 
@@ -702,7 +687,7 @@ app.get("/api/admin/contacts", authMiddleware, async (req, res) => {
   }
 });
 
-// Health check
+// Health Check
 app.get("/api/health", (req, res) => {
   res.json({
     status: "ok",
@@ -715,10 +700,12 @@ app.get("/api/health", (req, res) => {
 // STATIC FILES
 // ============================================
 app.use(express.static(path.join(__dirname, "public")));
-
-// All frontend routes -> index.html
-app.get("/admin", (req, res) => res.sendFile(path.join(__dirname, "public", "admin.html")));
-app.get("*", (req, res) => res.sendFile(path.join(__dirname, "public", "index.html")));
+app.get("/admin", (req, res) =>
+  res.sendFile(path.join(__dirname, "public", "admin.html"))
+);
+app.get("*", (req, res) =>
+  res.sendFile(path.join(__dirname, "public", "index.html"))
+);
 
 // ============================================
 // ERROR HANDLER
