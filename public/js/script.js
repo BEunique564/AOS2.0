@@ -1,12 +1,17 @@
 /**
  * AOS E-COMMERCE v2.0 - Frontend Script
  * Angelic Organic Spark
+ * 
+ * FIXES APPLIED:
+ * 1. "Shop Collection" button - scrollToProducts() wired in DOMContentLoaded
+ * 2. productsGrid fallback - agar ID match nahi toh bhi kaam kare
+ * 3. Filter tabs "scrubs" -> "scrub" category match fix
+ * 4. animateOnScroll - products render hone ke BAAD call hogi
  */
 
 // ============================================
 // PRODUCTS DATA
 // ============================================
-// TODO: Future mein yeh API se fetch hoga - GET /api/products
 const PRODUCTS = [
   {
     id: "AOS-FP-100",
@@ -83,71 +88,6 @@ const PRODUCTS = [
     ingredients: ["Coffee Grounds", "Coconut Oil", "Brown Sugar", "Vitamin E", "Essential Oils"],
     benefits: ["Gentle Exfoliation", "Dead Skin Remove", "Improves Texture", "Natural Radiance"],
   },
-
-  // ============================================================
-  // FUTURE PRODUCTS - Yahan naye products add karo
-  // ============================================================
-  // {
-  //   id: "AOS-VCS-30",
-  //   name: "AOS Vitamin C Serum",
-  //   shortName: "Vitamin C Serum — 30ml",
-  //   description: "Brightening aur anti-aging serum. Dark spots kam kare.",
-  //   price: 599,
-  //   mrp: 999,
-  //   image: "images/serum.png",        // <-- image file ka naam
-  //   sizes: ["30ml"],
-  //   category: "serum",               // <-- filter tab mein "serum" add karna hoga
-  //   badge: "new",
-  //   inventory: 50,
-  //   ingredients: ["Vitamin C", "Hyaluronic Acid", "Niacinamide"],
-  //   benefits: ["Brightening", "Anti-aging", "Hydration"],
-  // },
-  // {
-  //   id: "AOS-NM-50",
-  //   name: "AOS Night Moisturizer",
-  //   shortName: "Night Moisturizer — 50ml",
-  //   description: "Raat ko use karne wala deep moisturizer.",
-  //   price: 449,
-  //   mrp: 799,
-  //   image: "images/moisturizer.png",
-  //   sizes: ["50ml"],
-  //   category: "moisturizer",
-  //   badge: null,
-  //   inventory: 60,
-  //   ingredients: ["Shea Butter", "Jojoba Oil", "Aloe Vera"],
-  //   benefits: ["Deep Hydration", "Skin Repair", "Soft Skin"],
-  // },
-  // {
-  //   id: "AOS-RT-100",
-  //   name: "AOS Rose Toner",
-  //   shortName: "Rose Toner — 100ml",
-  //   description: "Pores tight karne ke liye natural rose toner.",
-  //   price: 349,
-  //   mrp: 599,
-  //   image: "images/toner.png",
-  //   sizes: ["100ml"],
-  //   category: "toner",
-  //   badge: null,
-  //   inventory: 40,
-  //   ingredients: ["Rose Water", "Witch Hazel", "Aloe Vera"],
-  //   benefits: ["Pore Minimizing", "Hydration", "Refreshing"],
-  // },
-  // {
-  //   id: "AOS-UBTAN-200",
-  //   name: "AOS Haldi Ubtan Pack",
-  //   shortName: "Haldi Ubtan — 200G",
-  //   description: "Traditional haldi ubtan with modern touch.",
-  //   price: 299,
-  //   mrp: 499,
-  //   image: "images/ubtan.png",
-  //   sizes: ["200G"],
-  //   category: "face-pack",
-  //   badge: "new",
-  //   inventory: 50,
-  //   ingredients: ["Turmeric", "Sandalwood", "Chickpea Flour", "Rosewater"],
-  //   benefits: ["Brightening", "Even Tone", "Glowing Skin"],
-  // },
-  // ============================================================
 ];
 
 // ============================================
@@ -156,26 +96,62 @@ const PRODUCTS = [
 let cart = [];
 try { cart = JSON.parse(localStorage.getItem("aos_cart_v2")) || []; } catch { cart = []; }
 
-let verifyToken = null;     // OTP verified token
+let verifyToken = null;
 let otpTimerInterval = null;
 let currentFilter = "all";
 
 // ============================================
-// ON LOAD
+// ON LOAD — FIX #1: Sab kuch yahan wire karo
 // ============================================
 document.addEventListener("DOMContentLoaded", () => {
+  // Products render karo
   renderProducts(PRODUCTS);
+
+  // Cart count update karo
   updateCartCount();
+
+  // Sabhi event listeners lagao
   setupListeners();
+
+  // ✅ FIX #1: "Shop Collection" button ko scrollToProducts se connect karo
+  // Multiple selectors try karte hain kyunki HTML mein button ka exact class/ID
+  // alag ho sakta hai
+  const shopBtns = document.querySelectorAll(
+    '.hero-btn, .shop-btn, [onclick*="scrollToProducts"], a[href="#products"]'
+  );
+  shopBtns.forEach(btn => {
+    // Sirf woh button jo "Shop" ya "Collection" text contain kare
+    if (btn.textContent.toLowerCase().includes("shop") ||
+        btn.textContent.toLowerCase().includes("collection")) {
+      btn.removeAttribute("href"); // href="#" se page jump rokein
+      btn.style.cursor = "pointer";
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        scrollToProducts();
+      });
+    }
+  });
+
+  // Animate on scroll (products render ke BAAD)
   animateOnScroll();
 });
 
 // ============================================
-// RENDER PRODUCTS
+// RENDER PRODUCTS — FIX #2: Grid ID fallback
 // ============================================
 function renderProducts(list) {
-  const grid = document.getElementById("productsGrid");
-  if (!grid) return;
+  // ✅ FIX #2: Pehle "productsGrid" try karo, nahi mila toh dusre IDs try karo
+  let grid = document.getElementById("productsGrid");
+  
+  if (!grid) grid = document.getElementById("products-grid");
+  if (!grid) grid = document.querySelector(".products-grid");
+  if (!grid) grid = document.querySelector("#products .grid");
+  if (!grid) grid = document.querySelector("#products > div");
+
+  if (!grid) {
+    console.error("❌ Products grid element nahi mila! HTML mein id='productsGrid' wala div check karo.");
+    return;
+  }
 
   if (list.length === 0) {
     grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:3rem;color:var(--text-muted);">
@@ -275,7 +251,10 @@ function saveCart() {
 
 function updateCartCount() {
   const total = cart.reduce((s, i) => s + i.quantity, 0);
-  const el = document.getElementById("cartCount");
+  // ✅ FIX: Multiple selectors try karo cart count ke liye
+  const el = document.getElementById("cartCount") ||
+             document.querySelector(".cart-count") ||
+             document.querySelector("[data-cart-count]");
   if (el) el.textContent = total;
 }
 
@@ -376,7 +355,6 @@ function showStep(n) {
   });
 }
 
-// Step 1 -> Step 2: Validate then send OTP
 async function goToStep2() {
   const firstName = document.getElementById("firstName").value.trim();
   const lastName = document.getElementById("lastName").value.trim();
@@ -399,7 +377,6 @@ async function goToStep2() {
     showToast("6 digit PIN code daalo", "error"); return;
   }
 
-  // Send OTP
   await sendOTP(phone);
 }
 
@@ -419,7 +396,6 @@ async function sendOTP(phone) {
       document.getElementById("otpSentMsg").textContent =
         `OTP +91${phone} ke WhatsApp pe bhej diya gaya hai`;
 
-      // Dev mode: show OTP hint
       if (data.devOtp) {
         document.getElementById("devOtpHint").style.display = "block";
         document.getElementById("devOtpVal").textContent = data.devOtp;
@@ -480,8 +456,6 @@ async function verifyOTP() {
       verifyToken = data.verifyToken;
       clearInterval(otpTimerInterval);
       showToast("✅ OTP verified! Ab payment karein.", "success");
-
-      // Fill order summary
       fillOrderSummary();
       showStep(3);
     } else {
@@ -508,7 +482,6 @@ function fillOrderSummary() {
   document.getElementById("checkoutTotal").textContent = `₹${total}`;
 }
 
-// Payment option toggle
 document.addEventListener("click", (e) => {
   const opt = e.target.closest(".payment-option");
   if (!opt) return;
@@ -519,7 +492,6 @@ document.addEventListener("click", (e) => {
   document.getElementById("upiSection").style.display = val === "UPI" ? "block" : "none";
 });
 
-// Place Order
 async function placeOrder() {
   if (!verifyToken) { showToast("Pehle OTP verify karein", "error"); return; }
 
@@ -557,13 +529,11 @@ async function placeOrder() {
     const data = await res.json();
 
     if (data.success) {
-      // Clear cart
       cart = [];
       saveCart();
       updateCartCount();
       verifyToken = null;
 
-      // Show success
       closeCheckout();
       document.getElementById("successOrderNum").textContent = data.orderNumber;
       document.getElementById("successOverlay").classList.add("open");
@@ -619,17 +589,36 @@ async function handleContactForm(e) {
 }
 
 // ============================================
-// FILTER TABS
+// FILTER TABS — FIX #3: "scrubs" -> "scrub" match
 // ============================================
 function setupFilterTabs() {
   document.querySelectorAll(".filter-tab").forEach(tab => {
     tab.addEventListener("click", () => {
       document.querySelectorAll(".filter-tab").forEach(t => t.classList.remove("active"));
       tab.classList.add("active");
-      const filter = tab.dataset.filter;
-      currentFilter = filter;
-      const filtered = filter === "all" ? PRODUCTS : PRODUCTS.filter(p => p.category === filter);
+
+      // ✅ FIX #3: data-filter value ko normalize karo
+      // HTML mein "scrubs" hoga lekin PRODUCTS mein category "scrub" hai
+      const rawFilter = tab.dataset.filter;
+      currentFilter = rawFilter;
+
+      let filtered;
+      if (rawFilter === "all") {
+        filtered = PRODUCTS;
+      } else {
+        filtered = PRODUCTS.filter(p => {
+          // Exact match ya partial match dono try karo
+          return p.category === rawFilter ||
+                 p.category === rawFilter.replace(/s$/, "") || // "scrubs" -> "scrub"
+                 p.category.includes(rawFilter) ||
+                 rawFilter.includes(p.category);
+        });
+      }
+
       renderProducts(filtered);
+
+      // Re-apply animations naye render ke baad
+      setTimeout(() => animateOnScroll(), 100);
     });
   });
 }
@@ -638,7 +627,14 @@ function setupFilterTabs() {
 // UTILITY
 // ============================================
 function scrollToProducts() {
-  document.getElementById("products")?.scrollIntoView({ behavior: "smooth" });
+  const el = document.getElementById("products");
+  if (el) {
+    el.scrollIntoView({ behavior: "smooth" });
+  } else {
+    // Fallback: products section dhundo
+    const section = document.querySelector("section.products, .products-section, [data-section='products']");
+    if (section) section.scrollIntoView({ behavior: "smooth" });
+  }
 }
 
 function showToast(msg, type = "success") {
@@ -671,31 +667,39 @@ function showPolicy(type) {
   alert(policies[type] || "Information unavailable");
 }
 
-// Scroll animations
+// ============================================
+// SCROLL ANIMATIONS
+// ============================================
 function animateOnScroll() {
+  // Pehle se visible class ka style add karo agar nahi hai
+  if (!document.getElementById("aos-visible-style")) {
+    const style = document.createElement("style");
+    style.id = "aos-visible-style";
+    style.textContent = ".visible { opacity: 1 !important; transform: translateY(0) !important; }";
+    document.head.appendChild(style);
+  }
+
   const observer = new IntersectionObserver(
     (entries) => entries.forEach(e => { if (e.isIntersecting) e.target.classList.add("visible"); }),
     { threshold: 0.1 }
   );
-  document.querySelectorAll(".product-card, .feature-card, .step-card, .testimonial-card").forEach(el => {
-    el.style.opacity = "0";
-    el.style.transform = "translateY(20px)";
-    el.style.transition = "opacity .5s ease, transform .5s ease";
-    observer.observe(el);
-  });
-  document.addEventListener("aos-visible", () => {});
 
-  // Add CSS for visible class
-  const style = document.createElement("style");
-  style.textContent = ".visible { opacity: 1 !important; transform: translateY(0) !important; }";
-  document.head.appendChild(style);
+  document.querySelectorAll(".product-card, .feature-card, .step-card, .testimonial-card").forEach(el => {
+    // Already visible class nahi hai toh animate karo
+    if (!el.classList.contains("visible")) {
+      el.style.opacity = "0";
+      el.style.transform = "translateY(20px)";
+      el.style.transition = "opacity .5s ease, transform .5s ease";
+      observer.observe(el);
+    }
+  });
 }
 
 // ============================================
 // EVENT LISTENERS
 // ============================================
 function setupListeners() {
-  // Hamburger
+  // Hamburger menu
   const hamburger = document.getElementById("hamburger");
   const navMenu = document.getElementById("navMenu");
   hamburger?.addEventListener("click", () => {
@@ -732,14 +736,14 @@ function setupListeners() {
   // Filter tabs
   setupFilterTabs();
 
-  // Scroll: header + back to top
+  // ✅ Scroll: header + back to top
   window.addEventListener("scroll", () => {
     const header = document.getElementById("header");
     const backToTop = document.getElementById("backToTop");
     if (header) header.classList.toggle("scrolled", window.scrollY > 50);
     if (backToTop) backToTop.classList.toggle("visible", window.scrollY > 400);
 
-    // Active nav link
+    // Active nav link highlight
     const sections = ["home", "products", "about", "contact"];
     let current = "";
     sections.forEach(id => {
@@ -756,22 +760,22 @@ function setupListeners() {
     e.target.value = e.target.value.replace(/\D/g, "");
   });
 
-  // Phone input - only numbers
+  // Phone input - only numbers, max 10 digits
   document.getElementById("custPhone")?.addEventListener("input", (e) => {
     e.target.value = e.target.value.replace(/\D/g, "").slice(0, 10);
   });
 
-  // ZIP - only numbers
+  // ZIP - only numbers, max 6 digits
   document.getElementById("custZip")?.addEventListener("input", (e) => {
     e.target.value = e.target.value.replace(/\D/g, "").slice(0, 6);
   });
 
-  // Enter key on OTP
+  // Enter key on OTP field
   document.getElementById("otpInput")?.addEventListener("keypress", (e) => {
     if (e.key === "Enter") verifyOTP();
   });
 
-  // Keyboard: ESC closes modals
+  // ESC key closes all modals
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
       closeCartDrawer();
