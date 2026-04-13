@@ -1,191 +1,174 @@
 /**
- * AOS Admin Panel v2.0 - JavaScript
- * ✅ CSP Compatible - Koi bhi onclick nahi
- * ✅ Firebase Firestore + localStorage fallback
- * ✅ Orders list, search, filter, status update
+ * AOS Admin Panel v2.0 — admin.js
+ * ✅ CSP Safe — koi inline onclick nahi
+ * ✅ JWT Auth (backend) + localStorage fallback
+ * ✅ Analytics, WhatsApp, Razorpay Sync, Live Tracking
  */
 
-// ============================================
-// FIREBASE CONFIG — apna config yahan daalo
-// ============================================
-const FIREBASE_CONFIG = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID",
-};
+// ============================================================
+// CONFIG — apna backend URL yahan set karo
+// ============================================================
+const API_BASE = window.location.origin; // same origin pe serve ho raha hai
 
-// Firebase available hai ya nahi — auto detect
-let db = null;
-let useFirebase = false;
-
-function initFirebase() {
-  try {
-    if (typeof firebase !== "undefined" && FIREBASE_CONFIG.apiKey !== "YOUR_API_KEY") {
-      if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
-      db = firebase.firestore();
-      useFirebase = true;
-      console.log("✅ Firebase connected");
-    } else {
-      console.warn("⚠️ Firebase config nahi mila — localStorage fallback use ho raha hai");
-    }
-  } catch (e) {
-    console.warn("⚠️ Firebase init failed:", e.message);
-  }
-}
-
-// ============================================
+// ============================================================
 // STATE
-// ============================================
-let TOKEN = localStorage.getItem("aos_admin_token") || "";
+// ============================================================
+let TOKEN        = localStorage.getItem("aos_admin_token") || "";
+let adminEmail   = localStorage.getItem("aos_admin_email") || "";
+let allOrders    = [];
 let currentOrderId = null;
-let currentPage = 1;
-let searchDebounce = null;
-let allOrders = []; // local cache
-const PAGE_SIZE = 15;
+let currentPage  = 1;
+let searchTimer  = null;
+const PAGE_SIZE  = 20;
 
-// ============================================
-// INIT
-// ============================================
+// Chart instances (destroy karo before re-render)
+const CHARTS = {};
+
+// ============================================================
+// BOOT
+// ============================================================
 document.addEventListener("DOMContentLoaded", () => {
-  initFirebase();
-
   if (TOKEN) {
     showAdminPanel();
     loadDashboard();
+  } else {
+    document.getElementById("loginPage").style.display = "flex";
   }
-
-  setupAdminListeners();
+  setupListeners();
 });
 
-// ============================================
-// EVENT LISTENERS — koi onclick nahi
-// ============================================
-function setupAdminListeners() {
+// ============================================================
+// ALL EVENT LISTENERS — koi onclick HTML mein nahi
+// ============================================================
+function setupListeners() {
   // Login
-  document.getElementById("loginPassword")?.addEventListener("keypress", (e) => {
+  document.getElementById("loginBtn")?.addEventListener("click", doLogin);
+  document.getElementById("loginPassword")?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") doLogin();
   });
-  document.getElementById("loginBtn")?.addEventListener("click", doLogin);
+
+  // Logout
   document.getElementById("logoutBtn")?.addEventListener("click", doLogout);
 
-  // Sidebar nav
-  document.querySelectorAll(".nav-item").forEach(item => {
+  // Sidebar toggle
+  document.getElementById("sidebarToggle")?.addEventListener("click", toggleSidebar);
+
+  // Nav items
+  document.querySelectorAll(".nav-item[data-section]").forEach((item) => {
     item.addEventListener("click", (e) => {
       e.preventDefault();
-      const section = item.dataset.section;
-      if (section) showSection(section);
+      showSection(item.dataset.section);
     });
   });
 
-  // "View All" button on dashboard
-  document.getElementById("viewAllOrdersBtn")?.addEventListener("click", () => {
-    showSection("orders");
-  });
+  // View all orders button (dashboard)
+  document.getElementById("viewAllOrdersBtn")?.addEventListener("click", () => showSection("orders"));
 
   // Refresh
   document.getElementById("refreshBtn")?.addEventListener("click", refreshCurrent);
 
-  // Search + filter
-  document.getElementById("orderSearch")?.addEventListener("input", debounceSearch);
-  document.getElementById("statusFilter")?.addEventListener("change", () => applyLocalFilter());
+  // Order search + filters
+  document.getElementById("orderSearch")?.addEventListener("input", () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => { currentPage = 1; applyFilter(); }, 380);
+  });
+  document.getElementById("statusFilter")?.addEventListener("change", () => { currentPage = 1; applyFilter(); });
+  document.getElementById("paymentFilter")?.addEventListener("change", () => { currentPage = 1; applyFilter(); });
 
-  // Order detail modal — close
-  document.getElementById("closeOrderDetailBtn")?.addEventListener("click", closeOrderDetail);
+  // Modal — close
+  document.getElementById("closeOrderDetailBtn")?.addEventListener("click", closeModal);
   document.getElementById("orderDetailOverlay")?.addEventListener("click", (e) => {
-    if (e.target === e.currentTarget) closeOrderDetail();
+    if (e.target === e.currentTarget) closeModal();
   });
 
-  // Update status
+  // Modal — update status
   document.getElementById("updateStatusBtn")?.addEventListener("click", updateOrderStatus);
 
-  // ESC key
+  // Razorpay sync
+  document.getElementById("razorpaySyncBtn")?.addEventListener("click", syncRazorpay);
+
+  // Keyboard
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closeOrderDetail();
+    if (e.key === "Escape") closeModal();
   });
 
-  // Event delegation — dashboard recent orders (click on row)
-  document.getElementById("recentOrdersList")?.addEventListener("click", (e) => {
-    const row = e.target.closest("tr[data-order-id]");
-    if (row) viewOrder(row.dataset.orderId);
-  });
-
-  // Event delegation — orders table view button
+  // Event delegation — orders table
   document.getElementById("ordersTableBody")?.addEventListener("click", (e) => {
-    const btn = e.target.closest(".btn-view");
-    if (btn) viewOrder(btn.dataset.orderId);
+    const viewBtn = e.target.closest(".btn-view");
+    if (viewBtn) { openOrderDetail(viewBtn.dataset.id); return; }
+    const waBtn = e.target.closest(".btn-wa");
+    if (waBtn) { openWhatsApp(waBtn.dataset.phone, waBtn.dataset.name, waBtn.dataset.order); return; }
   });
 
-  // Event delegation — pagination
+  // Event delegation — recent orders (dashboard)
+  document.getElementById("recentOrdersList")?.addEventListener("click", (e) => {
+    const row = e.target.closest("tr[data-id]");
+    if (row) openOrderDetail(row.dataset.id);
+  });
+
+  // Pagination
   document.getElementById("ordersPagination")?.addEventListener("click", (e) => {
-    const btn = e.target.closest(".page-btn");
-    if (btn && btn.dataset.page) renderOrdersPage(parseInt(btn.dataset.page));
+    const btn = e.target.closest(".page-btn[data-page]");
+    if (btn) { currentPage = parseInt(btn.dataset.page); applyFilter(); }
   });
 }
 
-// ============================================
-// AUTH
-// ============================================
-async function doLogin() {
-  const email = document.getElementById("loginEmail").value.trim();
-  const password = document.getElementById("loginPassword").value;
-  const btn = document.getElementById("loginBtn");
+// ============================================================
+// SIDEBAR TOGGLE
+// ============================================================
+function toggleSidebar() {
+  document.getElementById("sidebar")?.classList.toggle("collapsed");
+  document.getElementById("mainContent")?.classList.toggle("collapsed");
+}
 
+// ============================================================
+// AUTH
+// ============================================================
+async function doLogin() {
+  const email    = document.getElementById("loginEmail")?.value.trim();
+  const password = document.getElementById("loginPassword")?.value;
+  const btn      = document.getElementById("loginBtn");
+  const errEl    = document.getElementById("loginError");
+
+  errEl.style.display = "none";
   if (!email || !password) { showLoginError("Email aur password dono daalo"); return; }
 
   btn.innerHTML = '<span class="spinner-admin"></span> Logging in...';
   btn.disabled = true;
 
-  // --- Firebase Auth ---
-  if (useFirebase && typeof firebase !== "undefined") {
-    try {
-      await firebase.auth().signInWithEmailAndPassword(email, password);
-      const user = firebase.auth().currentUser;
-      TOKEN = await user.getIdToken();
-      localStorage.setItem("aos_admin_token", TOKEN);
-      document.getElementById("adminEmailDisplay").textContent = email;
-      showAdminPanel();
-      loadDashboard();
-    } catch (err) {
-      showLoginError(err.message || "Login failed");
-    } finally {
-      btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
-      btn.disabled = false;
-    }
-    return;
-  }
-
-  // --- Backend API Auth (fallback) ---
   try {
-    const res = await fetch("/api/admin/login", {
+    const res = await fetch(`${API_BASE}/api/admin/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
     });
     const data = await res.json();
+
     if (data.token) {
       TOKEN = data.token;
+      adminEmail = data.email || email;
       localStorage.setItem("aos_admin_token", TOKEN);
-      document.getElementById("adminEmailDisplay").textContent = data.email || email;
+      localStorage.setItem("aos_admin_email", adminEmail);
+      document.getElementById("adminEmailDisplay").textContent = adminEmail;
       showAdminPanel();
       loadDashboard();
     } else {
-      showLoginError(data.error || "Invalid credentials");
+      showLoginError(data.error || data.message || "Invalid credentials");
     }
   } catch {
-    // --- Dev/local fallback: hardcoded credentials ---
-    const ADMIN_EMAIL = "admin@aos.com";
-    const ADMIN_PASS  = "aos@admin123"; // sirf dev ke liye
-    if (email === ADMIN_EMAIL && password === ADMIN_PASS) {
-      TOKEN = "local_dev_token";
+    // Dev fallback
+    const DEV_EMAIL = "admin@aos.com";
+    const DEV_PASS  = "aos@admin123";
+    if (email === DEV_EMAIL && password === DEV_PASS) {
+      TOKEN = "dev_token_local";
+      adminEmail = email;
       localStorage.setItem("aos_admin_token", TOKEN);
+      localStorage.setItem("aos_admin_email", email);
       document.getElementById("adminEmailDisplay").textContent = email;
       showAdminPanel();
       loadDashboard();
     } else {
-      showLoginError("Server nahi mila. Dev mode: admin@aos.com / aos@admin123");
+      showLoginError("Server nahi mila. Dev: admin@aos.com / aos@admin123");
     }
   } finally {
     btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login';
@@ -199,493 +182,829 @@ function showLoginError(msg) {
 }
 
 function doLogout() {
-  TOKEN = "";
+  TOKEN = ""; adminEmail = "";
   localStorage.removeItem("aos_admin_token");
-  if (useFirebase && typeof firebase !== "undefined") {
-    firebase.auth().signOut().catch(() => {});
-  }
+  localStorage.removeItem("aos_admin_email");
   document.getElementById("adminPanel").style.display = "none";
-  document.getElementById("loginPage").style.display = "flex";
+  document.getElementById("loginPage").style.display  = "flex";
 }
 
 function showAdminPanel() {
-  document.getElementById("loginPage").style.display = "none";
+  document.getElementById("loginPage").style.display  = "none";
   document.getElementById("adminPanel").style.display = "flex";
+  if (adminEmail) document.getElementById("adminEmailDisplay").textContent = adminEmail;
 }
 
-// ============================================
-// DATA LAYER — Firebase ya localStorage
-// ============================================
-
-/** Saare orders fetch karo (Firebase ya localStorage) */
-async function fetchAllOrders() {
-  // --- Firebase ---
-  if (useFirebase && db) {
-    const snap = await db.collection("orders").orderBy("createdAt", "desc").get();
-    return snap.docs.map(d => ({ _id: d.id, ...d.data() }));
-  }
-
-  // --- localStorage fallback ---
-  const raw = localStorage.getItem("aos_orders");
-  if (raw) {
-    const orders = JSON.parse(raw);
-    // Newest first
-    return orders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  }
-
-  // --- Backend API fallback ---
+// ============================================================
+// DATA — fetch from backend / localStorage fallback
+// ============================================================
+async function fetchOrders() {
   try {
-    const res = await fetch("/api/admin/orders?limit=500", {
+    const res = await fetch(`${API_BASE}/api/admin/orders?limit=1000`, {
       headers: { Authorization: "Bearer " + TOKEN },
     });
     if (!res.ok) throw new Error("API error");
     const data = await res.json();
-    return data.orders || [];
+    return (data.orders || data || []).sort((a, b) =>
+      new Date(b.createdAt) - new Date(a.createdAt)
+    );
   } catch {
+    // localStorage fallback
+    try {
+      const raw = localStorage.getItem("aos_orders");
+      if (raw) {
+        const orders = JSON.parse(raw);
+        return orders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      }
+    } catch {}
     return [];
   }
 }
 
-/** Single order ka status update karo */
-async function updateOrderInDB(orderId, status) {
-  // --- Firebase ---
-  if (useFirebase && db) {
-    await db.collection("orders").doc(orderId).update({ status, updatedAt: new Date().toISOString() });
-    return true;
+async function fetchContacts() {
+  try {
+    const res = await fetch(`${API_BASE}/api/admin/contacts`, {
+      headers: { Authorization: "Bearer " + TOKEN },
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  } catch {
+    try {
+      const raw = localStorage.getItem("aos_contacts");
+      return raw ? JSON.parse(raw) : [];
+    } catch { return []; }
   }
-
-  // --- localStorage fallback ---
-  const raw = localStorage.getItem("aos_orders");
-  if (raw) {
-    const orders = JSON.parse(raw);
-    const idx = orders.findIndex(o => o._id === orderId || o.orderNumber === orderId);
-    if (idx !== -1) {
-      orders[idx].status = status;
-      orders[idx].updatedAt = new Date().toISOString();
-      localStorage.setItem("aos_orders", JSON.stringify(orders));
-      return true;
-    }
-  }
-
-  // --- Backend API fallback ---
-  const res = await fetch(`/api/admin/order/${orderId}`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: "Bearer " + TOKEN,
-    },
-    body: JSON.stringify({ status }),
-  });
-  const data = await res.json();
-  return data.success;
 }
 
-// ============================================
-// DASHBOARD
-// ============================================
-async function loadDashboard() {
+async function patchOrderStatus(orderId, status) {
   try {
-    allOrders = await fetchAllOrders();
+    const res = await fetch(`${API_BASE}/api/admin/order/${orderId}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + TOKEN,
+      },
+      body: JSON.stringify({ status }),
+    });
+    const data = await res.json();
+    return data.success !== false;
+  } catch {
+    // localStorage fallback
+    try {
+      const raw = localStorage.getItem("aos_orders");
+      if (raw) {
+        const orders = JSON.parse(raw);
+        const idx = orders.findIndex(o => (o._id === orderId || String(o.orderNumber) === String(orderId)));
+        if (idx !== -1) {
+          orders[idx].status = status;
+          orders[idx].updatedAt = new Date().toISOString();
+          localStorage.setItem("aos_orders", JSON.stringify(orders));
+          return true;
+        }
+      }
+    } catch {}
+    return false;
+  }
+}
+
+// ============================================================
+// DASHBOARD
+// ============================================================
+async function loadDashboard() {
+  setSpinRefresh(true);
+  try {
+    allOrders = await fetchOrders();
 
     const today = new Date().toDateString();
-    const totalOrders   = allOrders.length;
-    const pendingOrders = allOrders.filter(o => o.status === "Pending").length;
-    const totalRevenue  = allOrders.reduce((sum, o) => sum + (o.total || 0), 0);
-    const todayOrders   = allOrders.filter(o => new Date(o.createdAt).toDateString() === today).length;
+    const total      = allOrders.length;
+    const pending    = allOrders.filter(o => o.status === "Pending").length;
+    const delivered  = allOrders.filter(o => o.status === "Delivered").length;
+    const cancelled  = allOrders.filter(o => o.status === "Cancelled").length;
+    const revenue    = allOrders.reduce((s, o) => s + (parseFloat(o.total) || 0), 0);
+    const todayCount = allOrders.filter(o => new Date(o.createdAt).toDateString() === today).length;
 
-    setText("statTotal",   totalOrders);
-    setText("statPending", pendingOrders);
-    setText("statRevenue", "₹" + totalRevenue.toFixed(0));
-    setText("statToday",   todayOrders);
+    setText("statTotal",     total);
+    setText("statPending",   pending);
+    setText("statRevenue",   "₹" + formatNum(revenue));
+    setText("statToday",     todayCount);
+    setText("statDelivered", delivered);
+    setText("statCancelled", cancelled);
 
     const badge = document.getElementById("pendingBadge");
-    if (badge) {
-      badge.textContent = pendingOrders;
-      badge.style.display = pendingOrders > 0 ? "inline" : "none";
-    }
+    if (badge) { badge.textContent = pending; badge.style.display = pending > 0 ? "inline" : "none"; }
 
-    renderRecentOrders(allOrders.slice(0, 5));
+    renderRecentOrders(allOrders.slice(0, 6));
+    renderWeekChart(allOrders);
+    renderStatusChart(allOrders);
+    renderRevenueChart(allOrders);
   } catch (err) {
     console.error("Dashboard load error:", err);
+  } finally {
+    setSpinRefresh(false);
   }
 }
 
 function renderRecentOrders(orders) {
-  const container = document.getElementById("recentOrdersList");
-  if (!container) return;
+  const el = document.getElementById("recentOrdersList");
+  if (!el) return;
+  if (!orders.length) { el.innerHTML = '<div class="empty-state"><i class="fas fa-box-open"></i><p>Koi orders nahi hain abhi</p></div>'; return; }
 
-  if (!orders.length) {
-    container.innerHTML = '<p style="text-align:center;color:#78716c;padding:2rem;">Koi orders nahi hain abhi</p>';
-    return;
-  }
-
-  container.innerHTML = `
-    <table class="orders-table">
-      <thead><tr>
-        <th>Order #</th><th>Customer</th><th>Total</th><th>Status</th><th>Date</th>
-      </tr></thead>
-      <tbody>
-        ${orders.map(o => `
-          <tr style="cursor:pointer" data-order-id="${o._id || o.orderNumber}">
-            <td><span class="order-num">#${o.orderNumber || o._id}</span></td>
-            <td>
-              <div class="customer-name">${o.customer?.firstName || ""} ${o.customer?.lastName || ""}</div>
-              <div class="customer-phone">${o.customer?.phone || ""}</div>
-            </td>
-            <td class="total-amt">₹${(o.total || 0).toFixed(0)}</td>
-            <td><span class="status-badge s-${o.status}">${o.status || "Pending"}</span></td>
-            <td>${formatDate(o.createdAt)}</td>
-          </tr>
-        `).join("")}
-      </tbody>
-    </table>
+  el.innerHTML = `
+    <div class="orders-table-wrap">
+      <table class="orders-table">
+        <thead><tr><th>Order #</th><th>Customer</th><th>Total</th><th>Status</th><th>Date</th></tr></thead>
+        <tbody>
+          ${orders.map(o => `
+            <tr style="cursor:pointer" data-id="${o._id || o.orderNumber}">
+              <td><span class="order-num">#${o.orderNumber || o._id}</span></td>
+              <td>
+                <div class="customer-name">${esc(o.customer?.firstName || "")} ${esc(o.customer?.lastName || "")}</div>
+                <div class="customer-phone">${esc(o.customer?.phone || "")}</div>
+              </td>
+              <td class="total-amt">₹${formatNum(o.total)}</td>
+              <td><span class="status-badge s-${o.status}">${o.status || "Pending"}</span></td>
+              <td>${fmtDate(o.createdAt)}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
   `;
 }
 
-// ============================================
-// ORDERS — Search, Filter, Pagination
-// ============================================
-async function loadOrders(page = 1) {
-  currentPage = page;
-  const tbody = document.getElementById("ordersTableBody");
-  if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="8" class="loading-row"><div class="spinner-admin"></div> Loading...</td></tr>';
-
-  try {
-    if (!allOrders.length) allOrders = await fetchAllOrders();
-    applyLocalFilter();
-  } catch {
-    tbody.innerHTML = '<tr><td colspan="8" class="loading-row" style="color:#ef4444">Error loading orders</td></tr>';
-  }
+// ============================================================
+// CHARTS — Chart.js
+// ============================================================
+function destroyChart(key) {
+  if (CHARTS[key]) { CHARTS[key].destroy(); delete CHARTS[key]; }
 }
 
-/** Search + filter locally (fast, no extra API calls) */
-function applyLocalFilter() {
-  const status = document.getElementById("statusFilter")?.value || "all";
-  const search = (document.getElementById("orderSearch")?.value || "").toLowerCase().trim();
+function renderWeekChart(orders) {
+  destroyChart("week");
+  const canvas = document.getElementById("weekChart");
+  if (!canvas) return;
 
-  let filtered = [...allOrders];
-
-  // Status filter
-  if (status !== "all") {
-    filtered = filtered.filter(o => o.status === status);
+  const labels = [], data = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const ds = d.toDateString();
+    labels.push(d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric" }));
+    data.push(orders.filter(o => new Date(o.createdAt).toDateString() === ds).length);
   }
 
-  // Search filter — naam, phone, order number
+  CHARTS.week = new Chart(canvas, {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [{
+        label: "Orders",
+        data,
+        backgroundColor: "rgba(212,175,55,0.7)",
+        borderColor: "#d4af37",
+        borderWidth: 1,
+        borderRadius: 5,
+      }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: "#a09880", font: { size: 11 } }, grid: { color: "rgba(255,255,255,0.05)" } },
+        y: { ticks: { color: "#a09880", font: { size: 11 }, stepSize: 1 }, grid: { color: "rgba(255,255,255,0.05)" }, beginAtZero: true },
+      },
+    },
+  });
+}
+
+function renderStatusChart(orders) {
+  destroyChart("status");
+  const canvas = document.getElementById("statusChart");
+  if (!canvas) return;
+
+  const statusList = ["Pending", "Confirmed", "Processing", "Shipped", "Delivered", "Cancelled"];
+  const counts = statusList.map(s => orders.filter(o => o.status === s).length);
+  const colors = ["#fbbf24","#60a5fa","#c084fc","#86efac","#22c55e","#f87171"];
+
+  CHARTS.status = new Chart(canvas, {
+    type: "doughnut",
+    data: {
+      labels: statusList,
+      datasets: [{ data: counts, backgroundColor: colors, borderWidth: 2, borderColor: "#1a1914" }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: "right", labels: { color: "#a09880", font: { size: 11 }, boxWidth: 12, padding: 8 } },
+      },
+      cutout: "60%",
+    },
+  });
+}
+
+function renderRevenueChart(orders) {
+  destroyChart("revenue");
+  const canvas = document.getElementById("revenueChart");
+  if (!canvas) return;
+
+  const days = 30;
+  const labels = [], data = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const ds = d.toDateString();
+    labels.push(i % 5 === 0 ? d.toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "");
+    const dayRev = orders
+      .filter(o => new Date(o.createdAt).toDateString() === ds)
+      .reduce((s, o) => s + (parseFloat(o.total) || 0), 0);
+    data.push(Math.round(dayRev));
+  }
+
+  CHARTS.revenue = new Chart(canvas, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [{
+        label: "Revenue (₹)",
+        data,
+        borderColor: "#d4af37",
+        backgroundColor: "rgba(212,175,55,0.1)",
+        fill: true,
+        tension: 0.4,
+        pointRadius: 0,
+        pointHoverRadius: 5,
+        pointHoverBackgroundColor: "#d4af37",
+        borderWidth: 2,
+      }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: "#a09880", font: { size: 10 } }, grid: { color: "rgba(255,255,255,0.04)" } },
+        y: {
+          ticks: { color: "#a09880", font: { size: 10 }, callback: v => "₹" + formatNum(v) },
+          grid: { color: "rgba(255,255,255,0.04)" },
+          beginAtZero: true,
+        },
+      },
+    },
+  });
+}
+
+// ============================================================
+// ORDERS — filter, paginate, render
+// ============================================================
+function applyFilter() {
+  const status  = document.getElementById("statusFilter")?.value || "all";
+  const payment = document.getElementById("paymentFilter")?.value || "all";
+  const search  = (document.getElementById("orderSearch")?.value || "").toLowerCase().trim();
+
+  let filtered = [...allOrders];
+  if (status  !== "all") filtered = filtered.filter(o => o.status === status);
+  if (payment !== "all") filtered = filtered.filter(o => (o.paymentMethod || "COD") === payment);
   if (search) {
     filtered = filtered.filter(o => {
-      const name = `${o.customer?.firstName || ""} ${o.customer?.lastName || ""}`.toLowerCase();
-      const phone = (o.customer?.phone || "").toLowerCase();
+      const name     = `${o.customer?.firstName || ""} ${o.customer?.lastName || ""}`.toLowerCase();
+      const phone    = (o.customer?.phone || "").toLowerCase();
       const orderNum = String(o.orderNumber || o._id || "").toLowerCase();
       return name.includes(search) || phone.includes(search) || orderNum.includes(search);
     });
   }
 
-  // Paginate
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE) || 1;
-  const pageOrders = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  if (currentPage > totalPages) currentPage = totalPages;
+  const slice = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
-  renderOrdersTable(pageOrders);
+  renderOrdersTable(slice);
   renderPagination(totalPages, currentPage);
 }
 
 function renderOrdersTable(orders) {
   const tbody = document.getElementById("ordersTableBody");
   if (!tbody) return;
-
   if (!orders.length) {
-    tbody.innerHTML = '<tr><td colspan="8" class="loading-row">Koi orders nahi mili</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="loading-row"><i class="fas fa-search" style="margin-right:6px"></i>Koi orders nahi mili</td></tr>';
     return;
   }
 
-  tbody.innerHTML = orders.map(o => `
-    <tr>
-      <td><span class="order-num">#${o.orderNumber || o._id}</span></td>
-      <td>
-        <div class="customer-name">${o.customer?.firstName || ""} ${o.customer?.lastName || ""}</div>
-        <div class="customer-phone">${o.customer?.phone || ""}</div>
-      </td>
-      <td class="items-count">${o.items?.length || 0} item(s)</td>
-      <td class="total-amt">₹${(o.total || 0).toFixed(0)}</td>
-      <td><span class="pay-badge pay-${o.paymentMethod || "COD"}">${o.paymentMethod || "COD"}</span></td>
-      <td><span class="status-badge s-${o.status}">${o.status || "Pending"}</span></td>
-      <td>${formatDate(o.createdAt)}</td>
-      <td>
-        <button class="action-btn btn-view" data-order-id="${o._id || o.orderNumber}">
-          <i class="fas fa-eye"></i> View
-        </button>
-      </td>
-    </tr>
-  `).join("");
+  tbody.innerHTML = orders.map(o => {
+    const id    = o._id || o.orderNumber;
+    const name  = `${esc(o.customer?.firstName || "")} ${esc(o.customer?.lastName || "")}`.trim() || "—";
+    const phone = esc(o.customer?.phone || "");
+    const pm    = o.paymentMethod || "COD";
+    return `
+      <tr>
+        <td><span class="order-num">#${esc(String(o.orderNumber || o._id))}</span></td>
+        <td>
+          <div class="customer-name">${name}</div>
+          <div class="customer-phone">${phone}</div>
+        </td>
+        <td class="items-count">${o.items?.length || 0} item(s)</td>
+        <td class="total-amt">₹${formatNum(o.total)}</td>
+        <td><span class="pay-badge pay-${pm}">${pm}</span></td>
+        <td><span class="status-badge s-${o.status}">${o.status || "Pending"}</span></td>
+        <td>${fmtDate(o.createdAt)}</td>
+        <td>
+          <div class="actions-cell">
+            <button class="action-btn btn-view" data-id="${id}" title="View order"><i class="fas fa-eye"></i> View</button>
+            ${phone ? `<button class="action-btn btn-wa" data-phone="${phone}" data-name="${name}" data-order="${o.orderNumber || id}" title="WhatsApp"><i class="fab fa-whatsapp"></i></button>` : ""}
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join("");
 }
 
-function renderPagination(totalPages, current) {
-  const container = document.getElementById("ordersPagination");
-  if (!container) return;
-  if (totalPages <= 1) { container.innerHTML = ""; return; }
+function renderPagination(total, current) {
+  const el = document.getElementById("ordersPagination");
+  if (!el) return;
+  if (total <= 1) { el.innerHTML = ""; return; }
 
   let html = "";
-  if (current > 1)
-    html += `<button class="page-btn" data-page="${current - 1}">← Prev</button>`;
-  for (let i = 1; i <= totalPages; i++) {
+  if (current > 1) html += `<button class="page-btn" data-page="${current - 1}">← Prev</button>`;
+
+  const start = Math.max(1, current - 2);
+  const end   = Math.min(total, current + 2);
+  if (start > 1) html += `<button class="page-btn" data-page="1">1</button>${start > 2 ? '<span style="color:var(--text3);padding:0 4px;">…</span>' : ""}`;
+  for (let i = start; i <= end; i++) {
     html += `<button class="page-btn ${i === current ? "active" : ""}" data-page="${i}">${i}</button>`;
   }
-  if (current < totalPages)
-    html += `<button class="page-btn" data-page="${current + 1}">Next →</button>`;
+  if (end < total) html += `${end < total - 1 ? '<span style="color:var(--text3);padding:0 4px;">…</span>' : ""}<button class="page-btn" data-page="${total}">${total}</button>`;
 
-  container.innerHTML = html;
+  if (current < total) html += `<button class="page-btn" data-page="${current + 1}">Next →</button>`;
+  el.innerHTML = html;
 }
 
-function renderOrdersPage(page) {
-  currentPage = page;
-  applyLocalFilter();
-}
-
-function debounceSearch() {
-  clearTimeout(searchDebounce);
-  searchDebounce = setTimeout(() => {
-    currentPage = 1;
-    applyLocalFilter();
-  }, 400);
-}
-
-// ============================================
+// ============================================================
 // ORDER DETAIL MODAL
-// ============================================
-async function viewOrder(orderId) {
+// ============================================================
+async function openOrderDetail(orderId) {
   currentOrderId = orderId;
-  const overlay = document.getElementById("orderDetailOverlay");
-  const body = document.getElementById("orderDetailBody");
+  const overlay  = document.getElementById("orderDetailOverlay");
+  const body     = document.getElementById("orderDetailBody");
   if (!overlay || !body) return;
 
   overlay.classList.add("open");
-  body.innerHTML = '<div style="text-align:center;padding:2rem;"><div class="spinner-admin"></div></div>';
+  body.innerHTML = '<div style="text-align:center;padding:3rem;"><div class="spinner-admin" style="width:36px;height:36px;border-width:3px;"></div></div>';
 
-  try {
-    // Local cache mein dhundo pehle
-    let order = allOrders.find(o => o._id === orderId || String(o.orderNumber) === String(orderId));
+  const order = allOrders.find(o => String(o._id) === String(orderId) || String(o.orderNumber) === String(orderId));
 
-    // Agar cache mein nahi toh Firebase se
-    if (!order && useFirebase && db) {
-      const snap = await db.collection("orders").doc(orderId).get();
-      if (snap.exists) order = { _id: snap.id, ...snap.data() };
-    }
+  if (!order) {
+    body.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-circle" style="color:var(--red)"></i><p>Order nahi mila</p></div>';
+    return;
+  }
 
-    if (!order) { body.innerHTML = "<p style='color:red;text-align:center;'>Order not found</p>"; return; }
+  setText("orderDetailTitle", `Order #${order.orderNumber || order._id}`);
+  document.getElementById("statusUpdateSelect").value = order.status || "Pending";
 
-    const titleEl = document.getElementById("orderDetailTitle");
-    const statusSelect = document.getElementById("statusUpdateSelect");
-    if (titleEl) titleEl.textContent = `Order #${order.orderNumber || order._id}`;
-    if (statusSelect) statusSelect.value = order.status || "Pending";
+  const items = (order.items || []).map(i => `
+    <div class="order-item-row">
+      <span>${esc(i.name)} ${i.size ? `<span style="color:var(--text2);font-size:0.78rem">(${esc(i.size)})</span>` : ""} × ${i.quantity || 1}</span>
+      <span>₹${formatNum((parseFloat(i.price) || 0) * (parseInt(i.quantity) || 1))}</span>
+    </div>
+  `).join("") || "<p style='color:var(--text2)'>No items</p>";
 
-    const itemsHtml = (order.items || []).map(i => `
-      <div class="order-item-row">
-        <span>${i.name} ${i.size ? `(${i.size})` : ""} × ${i.quantity}</span>
-        <span>₹${(i.price * i.quantity).toFixed(0)}</span>
-      </div>
-    `).join("");
+  const phone = order.customer?.phone || "";
+  const name  = `${order.customer?.firstName || ""} ${order.customer?.lastName || ""}`.trim();
 
-    body.innerHTML = `
-      <div class="detail-section">
-        <h4>👤 Customer Information</h4>
-        <div class="detail-grid">
-          <div class="detail-item">
-            <span class="detail-label">Name</span>
-            <span class="detail-val">${order.customer?.firstName || ""} ${order.customer?.lastName || ""}</span>
-          </div>
-          <div class="detail-item">
-            <span class="detail-label">Phone / WhatsApp</span>
-            <span class="detail-val">${order.customer?.phone || "—"}</span>
-          </div>
-          <div class="detail-item">
-            <span class="detail-label">Email</span>
-            <span class="detail-val">${order.customer?.email || "—"}</span>
-          </div>
-          <div class="detail-item">
-            <span class="detail-label">OTP Verified</span>
-            <span class="detail-val">${order.otpVerified ? "✅ Yes" : "❌ No"}</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="detail-section">
-        <h4>📍 Delivery Address</h4>
-        <p style="font-size:.9rem;line-height:1.8;">
-          ${order.customer?.address || "—"}<br/>
-          ${order.customer?.city || ""}, ${order.customer?.state || ""} — ${order.customer?.zipCode || ""}
-        </p>
-      </div>
-
-      <div class="detail-section">
-        <h4>🛍️ Order Items</h4>
-        <div class="order-items-list">${itemsHtml || "<p>No items</p>"}</div>
-        <div style="display:flex;justify-content:space-between;padding:.75rem .5rem;font-weight:700;border-top:2px solid #d4af37;margin-top:.5rem;">
-          <span>Total</span>
-          <span>₹${(order.total || 0).toFixed(0)}
-            <span class="pay-badge pay-${order.paymentMethod || 'COD'}" style="margin-left:.5rem;">${order.paymentMethod || "COD"}</span>
+  body.innerHTML = `
+    <div class="detail-section">
+      <h4>👤 Customer Information</h4>
+      <div class="detail-grid">
+        <div class="detail-item"><span class="detail-label">Name</span><span class="detail-val">${esc(name) || "—"}</span></div>
+        <div class="detail-item"><span class="detail-label">Phone / WhatsApp</span>
+          <span class="detail-val">
+            ${phone ? `<a href="https://wa.me/91${phone.replace(/\D/g,"")}" target="_blank" rel="noopener" style="color:#25d366">${esc(phone)} <i class="fab fa-whatsapp"></i></a>` : "—"}
           </span>
         </div>
+        <div class="detail-item"><span class="detail-label">Email</span><span class="detail-val">${esc(order.customer?.email || "—")}</span></div>
+        <div class="detail-item"><span class="detail-label">OTP Verified</span><span class="detail-val">${order.otpVerified ? "✅ Yes" : "❌ No"}</span></div>
       </div>
+    </div>
 
-      <div class="detail-section">
-        <h4>📋 Order Info</h4>
-        <div class="detail-grid">
-          <div class="detail-item">
-            <span class="detail-label">Order Date</span>
-            <span class="detail-val">${formatDate(order.createdAt, true)}</span>
-          </div>
-          <div class="detail-item">
-            <span class="detail-label">Current Status</span>
-            <span class="status-badge s-${order.status}">${order.status || "Pending"}</span>
-          </div>
-        </div>
+    <div class="detail-section">
+      <h4>📍 Delivery Address</h4>
+      <div style="background:var(--bg3);border-radius:8px;padding:12px 14px;font-size:0.88rem;line-height:1.9;color:var(--text)">
+        ${esc(order.customer?.address || "—")}<br/>
+        ${[order.customer?.city, order.customer?.state].filter(Boolean).join(", ")}
+        ${order.customer?.zipCode ? " — " + esc(order.customer.zipCode) : ""}
       </div>
-    `;
-  } catch (err) {
-    body.innerHTML = "<p style='color:red;text-align:center;'>Error loading order details</p>";
-    console.error(err);
-  }
+    </div>
+
+    <div class="detail-section">
+      <h4>🛍️ Order Items</h4>
+      <div class="order-items-list">${items}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:.75rem .5rem;font-weight:700;border-top:2px solid var(--gold-dark);margin-top:.5rem;font-size:0.95rem;">
+        <span>Total</span>
+        <span style="color:var(--green)">
+          ₹${formatNum(order.total)}
+          <span class="pay-badge pay-${order.paymentMethod || "COD"}" style="margin-left:8px">${order.paymentMethod || "COD"}</span>
+          ${order.razorpayPaymentId ? `<span style="font-size:0.72rem;color:var(--text2);margin-left:6px">${esc(order.razorpayPaymentId)}</span>` : ""}
+        </span>
+      </div>
+    </div>
+
+    <div class="detail-section">
+      <h4>📦 Live Tracking</h4>
+      ${renderTrackingTimeline(order.status)}
+    </div>
+
+    <div class="detail-section">
+      <h4>📋 Order Info</h4>
+      <div class="detail-grid">
+        <div class="detail-item"><span class="detail-label">Order Date</span><span class="detail-val">${fmtDate(order.createdAt, true)}</span></div>
+        <div class="detail-item"><span class="detail-label">Last Updated</span><span class="detail-val">${fmtDate(order.updatedAt, true)}</span></div>
+        <div class="detail-item"><span class="detail-label">Order ID</span><span class="detail-val" style="font-size:0.78rem">${esc(String(order._id || "—"))}</span></div>
+        <div class="detail-item"><span class="detail-label">Current Status</span><span class="status-badge s-${order.status}">${order.status || "Pending"}</span></div>
+      </div>
+    </div>
+
+    ${phone ? `
+    <div class="detail-section">
+      <h4>💬 Quick WhatsApp Actions</h4>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="action-btn btn-wa" style="font-size:0.82rem"
+          onclick="openWhatsApp('${phone}','${esc(name)}','${order.orderNumber || order._id}','confirm')">
+          <i class="fab fa-whatsapp"></i> Order Confirm
+        </button>
+        <button class="action-btn btn-wa" style="font-size:0.82rem"
+          onclick="openWhatsApp('${phone}','${esc(name)}','${order.orderNumber || order._id}','shipped')">
+          <i class="fab fa-whatsapp"></i> Shipped Update
+        </button>
+        <button class="action-btn btn-wa" style="font-size:0.82rem"
+          onclick="openWhatsApp('${phone}','${esc(name)}','${order.orderNumber || order._id}','delivered')">
+          <i class="fab fa-whatsapp"></i> Delivery Done
+        </button>
+      </div>
+    </div>
+    ` : ""}
+  `;
+
+  // WA buttons inside modal — direct onclick (sirf modal ke andar, CSP-safe kyunki attribute nahi HTML mein hai)
+  body.querySelectorAll(".btn-wa").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const type = btn.getAttribute("onclick")?.match(/'(\w+)'\)$/)?.[1];
+      openWhatsApp(phone, name, String(order.orderNumber || order._id), type);
+      btn.removeAttribute("onclick");
+    });
+    btn.removeAttribute("onclick");
+  });
 }
 
-function closeOrderDetail() {
+function renderTrackingTimeline(currentStatus) {
+  const steps = [
+    { key: "Pending",    icon: "fa-clock",          label: "Order Placed",    desc: "Customer ne order diya" },
+    { key: "Confirmed",  icon: "fa-check",           label: "Confirmed",       desc: "Order confirm ho gaya" },
+    { key: "Processing", icon: "fa-box",             label: "Processing",      desc: "Pack ho raha hai" },
+    { key: "Shipped",    icon: "fa-truck",           label: "Shipped",         desc: "Courier ko diya" },
+    { key: "Delivered",  icon: "fa-check-double",    label: "Delivered",       desc: "Customer ko mil gaya" },
+  ];
+  const cancelledStatus = currentStatus === "Cancelled";
+  const stepIndex = steps.findIndex(s => s.key === currentStatus);
+
+  if (cancelledStatus) {
+    return `<div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:12px 16px;color:#f87171;font-size:0.88rem;"><i class="fas fa-times-circle" style="margin-right:6px"></i>Order cancelled ho gaya</div>`;
+  }
+
+  return `<ul class="tracking-timeline">
+    ${steps.map((step, idx) => {
+      let dotClass = "pending";
+      if (idx < stepIndex) dotClass = "done";
+      else if (idx === stepIndex) dotClass = "active-step";
+      const icon = idx < stepIndex ? "fa-check" : step.icon;
+      return `<li>
+        <div class="tl-dot ${dotClass}"><i class="fas ${icon}" style="font-size:0.6rem"></i></div>
+        <div class="tl-content">
+          <div class="tl-title" style="${idx === stepIndex ? "color:var(--gold)" : ""}">${step.label}</div>
+          <div class="tl-desc">${step.desc}</div>
+        </div>
+      </li>`;
+    }).join("")}
+  </ul>`;
+}
+
+function closeModal() {
   document.getElementById("orderDetailOverlay")?.classList.remove("open");
   currentOrderId = null;
 }
 
 async function updateOrderStatus() {
   if (!currentOrderId) return;
-
   const status = document.getElementById("statusUpdateSelect")?.value;
-  const btn = document.getElementById("updateStatusBtn");
+  const btn    = document.getElementById("updateStatusBtn");
   if (!btn || !status) return;
 
-  btn.innerHTML = '<div class="spinner-admin"></div> Updating...';
+  btn.innerHTML = '<div class="spinner-admin"></div> Saving...';
   btn.disabled = true;
 
   try {
-    const success = await updateOrderInDB(currentOrderId, status);
-    if (success) {
-      // Local cache bhi update karo
-      const idx = allOrders.findIndex(o => o._id === currentOrderId || String(o.orderNumber) === String(currentOrderId));
-      if (idx !== -1) allOrders[idx].status = status;
-
-      showAdminToast(`✅ Status updated to "${status}"`);
-      closeOrderDetail();
-      applyLocalFilter();   // Table refresh
-      loadDashboard();      // Stats refresh
+    const ok = await patchOrderStatus(currentOrderId, status);
+    if (ok) {
+      // Local cache update
+      const idx = allOrders.findIndex(o => String(o._id) === String(currentOrderId) || String(o.orderNumber) === String(currentOrderId));
+      if (idx !== -1) { allOrders[idx].status = status; allOrders[idx].updatedAt = new Date().toISOString(); }
+      showToast(`✅ Status updated: "${status}"`);
+      closeModal();
+      applyFilter();
+      loadDashboard();
     } else {
-      showAdminToast("❌ Update fail hua");
+      showToast("❌ Update fail hua");
     }
   } catch {
-    showAdminToast("❌ Server error");
+    showToast("❌ Server error");
   } finally {
-    btn.innerHTML = '<i class="fas fa-save"></i> Update Status';
+    btn.innerHTML = '<i class="fas fa-save"></i> Update';
     btn.disabled = false;
   }
 }
 
-// ============================================
-// CONTACTS
-// ============================================
-async function loadContacts() {
-  const container = document.getElementById("contactsList");
-  if (!container) return;
-  container.innerHTML = '<div class="spinner-admin" style="display:block;margin:2rem auto;"></div>';
+// ============================================================
+// WHATSAPP
+// ============================================================
+function openWhatsApp(phone, name, orderNum, type = "generic") {
+  if (!phone) return;
+  const clean = phone.replace(/\D/g, "");
+  const num   = clean.startsWith("91") ? clean : "91" + clean;
+
+  const templates = {
+    confirm:   `Namaste ${name}! 🌿\n\nAapka order *#${orderNum}* confirm ho gaya hai. Hum jald hi process karenge.\n\nAOS Angelic Organic Spark 🌸`,
+    shipped:   `Namaste ${name}! 📦\n\nAapka order *#${orderNum}* ship ho gaya hai! Jald hi aapke paas pahunchega.\n\nTracking details jald milenge.\n\nAOS Angelic Organic Spark 🌸`,
+    delivered: `Namaste ${name}! ✅\n\nAapka order *#${orderNum}* deliver ho gaya hai! Umeed hai aapko product pasand aaya.\n\nKoi bhi feedback ke liye reply karein.\n\nAOS Angelic Organic Spark 🌸`,
+    generic:   `Namaste ${name}! 🌿\n\nAapke order *#${orderNum}* ke baare mein kuch update hai.\n\nAOS Angelic Organic Spark 🌸`,
+  };
+
+  const msg = templates[type] || templates.generic;
+  window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`, "_blank", "noopener");
+}
+
+// ============================================================
+// RAZORPAY SYNC (UI only — backend se aata hai)
+// ============================================================
+async function syncRazorpay() {
+  const btn = document.getElementById("razorpaySyncBtn");
+  if (!btn) return;
+  btn.innerHTML = '<span class="spinner-admin"></span> Syncing...';
+  btn.style.pointerEvents = "none";
 
   try {
-    let contacts = [];
-
-    // Firebase
-    if (useFirebase && db) {
-      const snap = await db.collection("contacts").orderBy("createdAt", "desc").get();
-      contacts = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+    const res = await fetch(`${API_BASE}/api/admin/razorpay/sync`, {
+      method: "POST",
+      headers: { Authorization: "Bearer " + TOKEN },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      showToast(`✅ Razorpay sync done! ${data.synced || ""} payments updated`);
+      allOrders = [];
+      loadDashboard();
     } else {
-      // localStorage fallback
-      const raw = localStorage.getItem("aos_contacts");
-      contacts = raw ? JSON.parse(raw) : [];
-
-      // Backend API fallback
-      if (!contacts.length) {
-        const res = await fetch("/api/admin/contacts", {
-          headers: { Authorization: "Bearer " + TOKEN },
-        });
-        contacts = await res.json();
-      }
+      showToast("⚠️ Razorpay sync route nahi mila — backend mein add karo");
     }
-
-    if (!contacts.length) {
-      container.innerHTML = '<p style="text-align:center;color:#78716c;padding:2rem;">Koi messages nahi hain</p>';
-      return;
-    }
-
-    container.innerHTML = contacts.map(c => `
-      <div class="contact-card">
-        <div class="contact-card-header">
-          <div>
-            <div class="contact-name">${c.name || "—"}</div>
-            <div class="contact-meta">${c.email || ""} ${c.phone ? "| " + c.phone : ""}</div>
-          </div>
-          <div class="contact-date">${formatDate(c.createdAt)}</div>
-        </div>
-        <div class="contact-msg">${c.message || ""}</div>
-      </div>
-    `).join("");
   } catch {
-    container.innerHTML = '<p style="color:red;text-align:center;">Error loading messages</p>';
+    showToast("⚠️ Razorpay sync ke liye backend route chahiye: POST /api/admin/razorpay/sync");
+  } finally {
+    btn.innerHTML = '<i class="fas fa-sync-alt"></i> Sync Razorpay';
+    btn.style.pointerEvents = "";
   }
 }
 
-// ============================================
-// NAVIGATION
-// ============================================
-function showSection(name) {
-  ["dashboard", "orders", "contacts"].forEach(s => {
-    document.getElementById(`${s}Section`)?.classList.remove("active");
+// ============================================================
+// ANALYTICS
+// ============================================================
+async function loadAnalytics() {
+  if (!allOrders.length) allOrders = await fetchOrders();
+
+  const total     = allOrders.length;
+  const revenue   = allOrders.reduce((s, o) => s + (parseFloat(o.total) || 0), 0);
+  const avg       = total ? revenue / total : 0;
+  const delivered = allOrders.filter(o => o.status === "Delivered").length;
+  const rate      = total ? ((delivered / total) * 100).toFixed(1) : 0;
+
+  const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
+  const weekRev = allOrders.filter(o => new Date(o.createdAt) >= weekAgo).reduce((s, o) => s + (parseFloat(o.total) || 0), 0);
+
+  setText("aStatRevenue",      "₹" + formatNum(revenue));
+  setText("aStatAvg",          "₹" + formatNum(avg));
+  setText("aStatDeliveryRate", rate + "%");
+  setText("aStatWeekRev",      "₹" + formatNum(weekRev));
+
+  renderMonthlyChart(allOrders);
+  renderTopProducts(allOrders);
+  renderCityChart(allOrders);
+}
+
+function renderMonthlyChart(orders) {
+  destroyChart("monthly");
+  const canvas = document.getElementById("monthlyRevenueChart");
+  if (!canvas) return;
+
+  const months = {};
+  orders.forEach(o => {
+    const d = new Date(o.createdAt);
+    if (isNaN(d)) return;
+    const key = d.toLocaleDateString("en-IN", { month: "short", year: "2-digit" });
+    months[key] = (months[key] || 0) + (parseFloat(o.total) || 0);
   });
+
+  const entries = Object.entries(months).slice(-12);
+  const labels  = entries.map(e => e[0]);
+  const data    = entries.map(e => Math.round(e[1]));
+
+  CHARTS.monthly = new Chart(canvas, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [{
+        label: "Revenue (₹)",
+        data,
+        borderColor: "#d4af37",
+        backgroundColor: "rgba(212,175,55,0.12)",
+        fill: true,
+        tension: 0.4,
+        pointRadius: 4,
+        pointBackgroundColor: "#d4af37",
+        borderWidth: 2,
+      }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: "#a09880", font: { size: 11 } }, grid: { color: "rgba(255,255,255,0.04)" } },
+        y: {
+          ticks: { color: "#a09880", font: { size: 11 }, callback: v => "₹" + formatNum(v) },
+          grid: { color: "rgba(255,255,255,0.04)" },
+          beginAtZero: true,
+        },
+      },
+    },
+  });
+}
+
+function renderTopProducts(orders) {
+  const el = document.getElementById("topProductsList");
+  if (!el) return;
+
+  const counts = {};
+  orders.forEach(o => {
+    (o.items || []).forEach(i => {
+      const key = i.name || "Unknown";
+      counts[key] = (counts[key] || 0) + (parseInt(i.quantity) || 1);
+    });
+  });
+
+  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const max    = sorted[0]?.[1] || 1;
+
+  if (!sorted.length) { el.innerHTML = '<p style="color:var(--text2);font-size:0.85rem">No product data</p>'; return; }
+
+  el.innerHTML = sorted.map(([name, qty]) => `
+    <div style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <span style="font-size:0.82rem;color:var(--text);font-weight:500">${esc(name)}</span>
+        <span style="font-size:0.78rem;color:var(--text2)">${qty} sold</span>
+      </div>
+      <div style="background:var(--bg3);border-radius:4px;height:6px;overflow:hidden">
+        <div style="height:100%;width:${Math.round((qty/max)*100)}%;background:linear-gradient(90deg,var(--gold),var(--gold-light));border-radius:4px;transition:width 0.5s"></div>
+      </div>
+    </div>
+  `).join("");
+}
+
+function renderCityChart(orders) {
+  destroyChart("city");
+  const canvas = document.getElementById("cityChart");
+  if (!canvas) return;
+
+  const cities = {};
+  orders.forEach(o => {
+    const city = (o.customer?.city || "Unknown").trim();
+    cities[city] = (cities[city] || 0) + 1;
+  });
+
+  const sorted = Object.entries(cities).sort((a, b) => b[1] - a[1]).slice(0, 10);
+
+  CHARTS.city = new Chart(canvas, {
+    type: "bar",
+    data: {
+      labels: sorted.map(e => e[0]),
+      datasets: [{
+        label: "Orders",
+        data: sorted.map(e => e[1]),
+        backgroundColor: "rgba(168,85,247,0.6)",
+        borderColor: "#a855f7",
+        borderWidth: 1,
+        borderRadius: 4,
+      }],
+    },
+    options: {
+      indexAxis: "y",
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: "#a09880", font: { size: 11 }, stepSize: 1 }, grid: { color: "rgba(255,255,255,0.04)" }, beginAtZero: true },
+        y: { ticks: { color: "#a09880", font: { size: 11 } }, grid: { display: false } },
+      },
+    },
+  });
+}
+
+// ============================================================
+// CONTACTS
+// ============================================================
+async function loadContacts() {
+  const el = document.getElementById("contactsList");
+  if (!el) return;
+  el.innerHTML = '<div style="text-align:center;padding:3rem"><div class="spinner-admin" style="width:36px;height:36px;border-width:3px"></div></div>';
+
+  const contacts = await fetchContacts();
+
+  if (!contacts.length) {
+    el.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>Koi messages nahi hain</p></div>';
+    return;
+  }
+
+  el.innerHTML = contacts.map(c => `
+    <div class="contact-card">
+      <div class="contact-card-header">
+        <div>
+          <div class="contact-name">${esc(c.name || "—")}</div>
+          <div class="contact-meta">
+            ${c.email ? `<a href="mailto:${esc(c.email)}" style="color:var(--gold)">${esc(c.email)}</a>` : ""}
+            ${c.phone ? ` &nbsp;|&nbsp; <a href="https://wa.me/91${c.phone.replace(/\D/g,"")}" target="_blank" rel="noopener" style="color:#25d366">${esc(c.phone)} <i class="fab fa-whatsapp"></i></a>` : ""}
+          </div>
+        </div>
+        <div class="contact-date">${fmtDate(c.createdAt)}</div>
+      </div>
+      <div class="contact-msg">${esc(c.message || "")}</div>
+    </div>
+  `).join("");
+}
+
+// ============================================================
+// NAVIGATION
+// ============================================================
+function showSection(name) {
+  const sections = ["dashboard", "orders", "analytics", "contacts"];
+  sections.forEach(s => document.getElementById(`${s}Section`)?.classList.remove("active"));
   document.getElementById(`${name}Section`)?.classList.add("active");
 
   document.querySelectorAll(".nav-item").forEach(i => i.classList.remove("active"));
   document.querySelector(`.nav-item[data-section="${name}"]`)?.classList.add("active");
 
-  const titles = { dashboard: "Dashboard", orders: "Orders", contacts: "Messages" };
+  const titles = { dashboard: "Dashboard", orders: "Orders", analytics: "Analytics", contacts: "Messages" };
   setText("pageTitle", titles[name] || name);
 
-  if (name === "orders") loadOrders(1);
-  else if (name === "contacts") loadContacts();
+  if (name === "orders")    { if (!allOrders.length) fetchOrders().then(o => { allOrders = o; applyFilter(); }); else applyFilter(); }
+  else if (name === "analytics") loadAnalytics();
+  else if (name === "contacts")  loadContacts();
   else if (name === "dashboard") loadDashboard();
 }
 
 function refreshCurrent() {
-  const active = document.querySelector(".nav-item.active")?.dataset.section;
-  if (active) showSection(active);
+  setSpinRefresh(true);
+  const active = document.querySelector(".nav-item.active")?.dataset.section || "dashboard";
+  allOrders = []; // force fresh fetch
+  setTimeout(() => {
+    showSection(active);
+    setSpinRefresh(false);
+  }, 300);
 }
 
-// ============================================
+function setSpinRefresh(on) {
+  document.getElementById("refreshBtn")?.classList.toggle("spinning", on);
+}
+
+// ============================================================
 // HELPERS
-// ============================================
+// ============================================================
 function setText(id, val) {
   const el = document.getElementById(id);
   if (el) el.textContent = val;
 }
 
-function formatDate(iso, full = false) {
+function formatNum(n) {
+  const num = parseFloat(n) || 0;
+  if (num >= 100000) return (num / 100000).toFixed(1) + "L";
+  if (num >= 1000)   return (num / 1000).toFixed(1) + "K";
+  return Math.round(num).toLocaleString("en-IN");
+}
+
+function fmtDate(iso, full = false) {
   if (!iso) return "—";
   const d = new Date(iso);
   if (isNaN(d)) return "—";
-  if (full) {
-    return (
-      d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) +
-      " " +
-      d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })
-    );
-  }
+  if (full) return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) + " " + d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
   return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-function showAdminToast(msg) {
-  const toast = document.getElementById("adminToast");
-  if (!toast) return;
-  toast.textContent = msg;
-  toast.classList.add("show");
-  setTimeout(() => toast.classList.remove("show"), 3000);
+function esc(str) {
+  if (str == null) return "";
+  return String(str).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+function showToast(msg, duration = 3500) {
+  const el = document.getElementById("adminToast");
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.add("show");
+  setTimeout(() => el.classList.remove("show"), duration);
 }
