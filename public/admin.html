@@ -22,18 +22,17 @@
 
     <div class="form-field">
       <label><i class="fas fa-envelope"></i> Email</label>
-      <!-- Admin email yahan daalo - .env mein ADMIN_EMAIL -->
       <input type="email" id="loginEmail" placeholder="admin@aos.com" autocomplete="username" />
     </div>
     <div class="form-field">
       <label><i class="fas fa-lock"></i> Password</label>
-      <!-- Admin password - .env mein ADMIN_PASSWORD -->
       <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password" />
     </div>
 
     <div id="loginError" class="login-error" style="display:none"></div>
 
-    <button class="login-btn" id="loginBtn" onclick="doLogin()">
+    <!-- ✅ FIX: onclick="doLogin()" hata diya, id lagaya -->
+    <button class="login-btn" id="loginBtn">
       <i class="fas fa-sign-in-alt"></i> Login
     </button>
     <a href="/" class="back-link"><i class="fas fa-arrow-left"></i> Back to Store</a>
@@ -49,19 +48,21 @@
       <button class="sidebar-toggle" id="sidebarToggle"><i class="fas fa-bars"></i></button>
     </div>
     <nav class="sidebar-nav">
-      <a href="#" class="nav-item active" data-section="dashboard" onclick="showSection('dashboard')">
+      <!-- ✅ FIX: onclick="showSection(...)" hata diya, data-section attribute se JS handle karega -->
+      <a href="#" class="nav-item active" data-section="dashboard">
         <i class="fas fa-tachometer-alt"></i> <span>Dashboard</span>
       </a>
-      <a href="#" class="nav-item" data-section="orders" onclick="showSection('orders')">
+      <a href="#" class="nav-item" data-section="orders">
         <i class="fas fa-shopping-bag"></i> <span>Orders</span>
         <span class="nav-badge" id="pendingBadge">0</span>
       </a>
-      <a href="#" class="nav-item" data-section="contacts" onclick="showSection('contacts')">
+      <a href="#" class="nav-item" data-section="contacts">
         <i class="fas fa-envelope"></i> <span>Messages</span>
       </a>
     </nav>
     <div class="sidebar-footer">
-      <button class="logout-btn" onclick="doLogout()">
+      <!-- ✅ FIX: onclick="doLogout()" hata diya -->
+      <button class="logout-btn" id="logoutBtn">
         <i class="fas fa-sign-out-alt"></i> <span>Logout</span>
       </button>
     </div>
@@ -74,7 +75,8 @@
       <h1 id="pageTitle">Dashboard</h1>
       <div class="topbar-right">
         <span id="adminEmailDisplay" class="admin-email"></span>
-        <button class="refresh-btn" onclick="refreshCurrent()">
+        <!-- ✅ FIX: onclick="refreshCurrent()" hata diya -->
+        <button class="refresh-btn" id="refreshBtn">
           <i class="fas fa-sync-alt"></i>
         </button>
       </div>
@@ -116,7 +118,8 @@
       <div class="recent-orders">
         <div class="section-title-bar">
           <h3>Recent Orders</h3>
-          <button class="view-all-btn" onclick="showSection('orders')">View All</button>
+          <!-- ✅ FIX: onclick="showSection('orders')" hata diya, data-section lagaya -->
+          <button class="view-all-btn" id="viewAllOrdersBtn" data-section="orders">View All</button>
         </div>
         <div id="recentOrdersList"></div>
       </div>
@@ -127,12 +130,12 @@
       <div class="orders-toolbar">
         <div class="search-wrap">
           <i class="fas fa-search"></i>
-          <!-- Order search: naam, phone, order number se search karo -->
-          <input type="text" id="orderSearch" placeholder="Search by name, phone, order#..." oninput="debounceSearch()" />
+          <!-- ✅ FIX: oninput="debounceSearch()" hata diya, id se JS handle karega -->
+          <input type="text" id="orderSearch" placeholder="Search by name, phone, order#..." />
         </div>
         <div class="filter-wrap">
-          <!-- Status filter -->
-          <select id="statusFilter" onchange="loadOrders()">
+          <!-- ✅ FIX: onchange="loadOrders()" hata diya -->
+          <select id="statusFilter">
             <option value="all">All Status</option>
             <option value="Pending">Pending</option>
             <option value="Confirmed">Confirmed</option>
@@ -175,11 +178,13 @@
 </div>
 
 <!-- ORDER DETAIL MODAL -->
-<div class="admin-modal-overlay" id="orderDetailOverlay" onclick="if(event.target===this)closeOrderDetail()">
+<!-- ✅ FIX: onclick="if(event.target===this)closeOrderDetail()" hata diya, id lagaya -->
+<div class="admin-modal-overlay" id="orderDetailOverlay">
   <div class="admin-modal">
     <div class="admin-modal-header">
       <h3 id="orderDetailTitle">Order Details</h3>
-      <button onclick="closeOrderDetail()"><i class="fas fa-times"></i></button>
+      <!-- ✅ FIX: onclick="closeOrderDetail()" hata diya -->
+      <button id="closeOrderDetailBtn"><i class="fas fa-times"></i></button>
     </div>
     <div class="admin-modal-body" id="orderDetailBody"></div>
     <div class="admin-modal-footer">
@@ -192,7 +197,8 @@
         <option value="Delivered">Delivered</option>
         <option value="Cancelled">Cancelled</option>
       </select>
-      <button class="update-btn" id="updateStatusBtn" onclick="updateOrderStatus()">
+      <!-- ✅ FIX: onclick="updateOrderStatus()" hata diya -->
+      <button class="update-btn" id="updateStatusBtn">
         <i class="fas fa-save"></i> Update Status
       </button>
     </div>
