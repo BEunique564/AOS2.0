@@ -24,7 +24,7 @@
   <nav class="navbar">
     <div class="nav-container">
       <a href="#home" class="logo">
-        <img src="images/logo.png" alt="AOS Logo" class="logo-img" onerror="this.style.display='none'" />
+        <img src="images/logo.png" alt="AOS Logo" class="logo-img" />
         <div class="logo-text">
           <span class="brand-name">AOS</span>
           <span class="brand-tagline">Angelic Organic Spark</span>
@@ -57,7 +57,7 @@
   <div class="container">
     <div class="hero-content">
       <div class="hero-text">
-        <span class="hero-badge">🌿 100% Organic & Natural</span>
+        <span class="hero-badge">🌿 100% Organic &amp; Natural</span>
         <h1 class="hero-title">
           Discover Your<br />
           <span class="text-gold">Natural Radiance</span>
@@ -67,7 +67,8 @@
           nature's finest ingredients. No chemicals, only pure goodness.
         </p>
         <div class="hero-actions">
-          <button class="btn-primary" onclick="scrollToProducts()">
+          <!-- ✅ FIX: onclick hata diya, id lagaya — JS mein event listener hai -->
+          <button class="btn-primary" id="shopCollectionBtn">
             <i class="fas fa-shopping-bag"></i> Shop Collection
           </button>
           <a href="#about" class="btn-outline">Learn More</a>
@@ -80,8 +81,7 @@
       </div>
       <div class="hero-visual">
         <div class="hero-img-wrapper">
-          <img src="images/multiple.png" alt="AOS Premium Skincare Products"
-               onerror="this.parentElement.innerHTML='<div class=\'hero-img-placeholder\'><i class=\'fas fa-spa\'></i></div>'" />
+          <img src="images/multiple.png" alt="AOS Premium Skincare Products" />
           <div class="hero-float-badge top-right">
             <span class="float-num">5★</span>
             <span class="float-txt">Customer Rating</span>
@@ -126,12 +126,6 @@
       <button class="filter-tab active" data-filter="all">All Products</button>
       <button class="filter-tab" data-filter="face-pack">Face Packs</button>
       <button class="filter-tab" data-filter="scrub">Scrubs</button>
-      <!-- 
-        FUTURE CATEGORY TABS:
-        <button class="filter-tab" data-filter="serum">Serums</button>
-        <button class="filter-tab" data-filter="moisturizer">Moisturizers</button>
-        <button class="filter-tab" data-filter="toner">Toners</button>
-      -->
     </div>
 
     <div class="products-grid" id="productsGrid">
@@ -146,8 +140,7 @@
     <div class="about-grid">
       <div class="about-visual">
         <div class="about-img-stack">
-          <img src="images/steps.png" alt="How AOS Works"
-               onerror="this.parentElement.innerHTML='<div class=\'about-img-placeholder\'><i class=\'fas fa-seedling\'></i><p>Pure. Natural. Effective.</p></div>'" />
+          <img src="images/steps.png" alt="How AOS Works" />
         </div>
         <div class="about-stats">
           <div class="stat-card"><span class="stat-num">100%</span><span class="stat-label">Organic</span></div>
@@ -172,31 +165,19 @@
         <div class="features-grid">
           <div class="feature-card">
             <div class="feature-icon"><i class="fas fa-leaf"></i></div>
-            <div>
-              <h4>100% Organic</h4>
-              <p>Natural ingredients, responsibly sourced</p>
-            </div>
+            <div><h4>100% Organic</h4><p>Natural ingredients, responsibly sourced</p></div>
           </div>
           <div class="feature-card">
             <div class="feature-icon"><i class="fas fa-heart"></i></div>
-            <div>
-              <h4>Cruelty-Free</h4>
-              <p>Never tested on animals, ever</p>
-            </div>
+            <div><h4>Cruelty-Free</h4><p>Never tested on animals, ever</p></div>
           </div>
           <div class="feature-card">
             <div class="feature-icon"><i class="fas fa-flask"></i></div>
-            <div>
-              <h4>No Parabens</h4>
-              <p>Clean formulas, zero nasties</p>
-            </div>
+            <div><h4>No Parabens</h4><p>Clean formulas, zero nasties</p></div>
           </div>
           <div class="feature-card">
             <div class="feature-icon"><i class="fas fa-award"></i></div>
-            <div>
-              <h4>Premium Quality</h4>
-              <p>Luxury skincare, affordable price</p>
-            </div>
+            <div><h4>Premium Quality</h4><p>Luxury skincare, affordable price</p></div>
           </div>
         </div>
       </div>
@@ -366,16 +347,16 @@
           <li><a href="#products">Face Pack 50G</a></li>
           <li><a href="#products">Face Pack 30G</a></li>
           <li><a href="#products">Face Scrub</a></li>
-          <!-- FUTURE PRODUCTS: Serum, Moisturizer, Toner -->
         </ul>
       </div>
       <div class="footer-col">
         <h4>Policies</h4>
         <ul>
-          <li><a href="#" onclick="showPolicy('shipping')">Shipping Policy</a></li>
-          <li><a href="#" onclick="showPolicy('return')">Return Policy</a></li>
-          <li><a href="#" onclick="showPolicy('privacy')">Privacy Policy</a></li>
-          <li><a href="#" onclick="showPolicy('terms')">Terms of Service</a></li>
+          <!-- ✅ FIX: onclick hata diya, data-policy attribute lagaya -->
+          <li><a href="#" class="policy-link" data-policy="shipping">Shipping Policy</a></li>
+          <li><a href="#" class="policy-link" data-policy="return">Return Policy</a></li>
+          <li><a href="#" class="policy-link" data-policy="privacy">Privacy Policy</a></li>
+          <li><a href="#" class="policy-link" data-policy="terms">Terms of Service</a></li>
         </ul>
       </div>
     </div>
@@ -391,12 +372,11 @@
 <div class="cart-drawer" id="cartDrawer">
   <div class="drawer-header">
     <h3>🛍️ Shopping Cart</h3>
+    <!-- ✅ FIX: onclick hata diya, id se JS handle karega -->
     <button class="drawer-close" id="closeCart"><i class="fas fa-times"></i></button>
   </div>
   <div class="drawer-body">
-    <div id="cartItems" class="cart-items-list">
-      <!-- Cart items injected by JS -->
-    </div>
+    <div id="cartItems" class="cart-items-list"></div>
   </div>
   <div class="drawer-footer" id="cartFooter" style="display:none">
     <div class="cart-summary">
@@ -410,7 +390,8 @@
         <strong>Total</strong><strong id="cartTotal">₹0</strong>
       </div>
     </div>
-    <button class="btn-primary" style="width:100%" onclick="openCheckout()">
+    <!-- ✅ FIX: onclick hata diya -->
+    <button class="btn-primary" id="checkoutBtn" style="width:100%">
       Proceed to Checkout <i class="fas fa-arrow-right"></i>
     </button>
   </div>
@@ -421,7 +402,8 @@
   <div class="modal-box checkout-modal">
     <div class="modal-header">
       <h3>Secure Checkout</h3>
-      <button class="modal-close" onclick="closeCheckout()"><i class="fas fa-times"></i></button>
+      <!-- ✅ FIX: onclick hata diya -->
+      <button class="modal-close" id="closeCheckoutBtn"><i class="fas fa-times"></i></button>
     </div>
 
     <!-- Progress Steps -->
@@ -441,59 +423,50 @@
 
     <!-- STEP 1: Customer Details -->
     <div id="checkoutStep1" class="checkout-step active">
-      <form id="detailsForm">
-        <h4 class="step-title">📦 Delivery Information</h4>
-        <div class="form-row">
-          <div class="form-field">
-            <label>First Name *</label>
-            <!-- Apna pehla naam daalo -->
-            <input type="text" id="firstName" placeholder="Rahul" required />
-          </div>
-          <div class="form-field">
-            <label>Last Name *</label>
-            <!-- Family name / surname -->
-            <input type="text" id="lastName" placeholder="Sharma" required />
-          </div>
+      <h4 class="step-title">📦 Delivery Information</h4>
+      <div class="form-row">
+        <div class="form-field">
+          <label>First Name *</label>
+          <input type="text" id="firstName" placeholder="Rahul" required />
         </div>
         <div class="form-field">
-          <label>Email *</label>
-          <!-- Order confirmation email aayega yahan -->
-          <input type="email" id="custEmail" placeholder="rahul@email.com" required />
+          <label>Last Name *</label>
+          <input type="text" id="lastName" placeholder="Sharma" required />
+        </div>
+      </div>
+      <div class="form-field">
+        <label>Email *</label>
+        <input type="email" id="custEmail" placeholder="rahul@email.com" required />
+      </div>
+      <div class="form-field">
+        <label>WhatsApp Number * <span class="hint">(OTP aayega)</span></label>
+        <div class="phone-input">
+          <span class="phone-prefix">+91</span>
+          <input type="tel" id="custPhone" placeholder="9876543210" maxlength="10" required />
+        </div>
+      </div>
+      <div class="form-field">
+        <label>Full Address *</label>
+        <input type="text" id="custAddress" placeholder="House No., Street, Mohalla" required />
+      </div>
+      <div class="form-row">
+        <div class="form-field">
+          <label>City *</label>
+          <input type="text" id="custCity" placeholder="Lucknow" required />
         </div>
         <div class="form-field">
-          <label>WhatsApp Number * <span class="hint">(OTP aayega)</span></label>
-          <!-- Yahan WhatsApp wala number daalo - OTP aayega -->
-          <div class="phone-input">
-            <span class="phone-prefix">+91</span>
-            <input type="tel" id="custPhone" placeholder="9876543210" maxlength="10" required />
-          </div>
+          <label>State</label>
+          <input type="text" id="custState" placeholder="Uttar Pradesh" value="Uttar Pradesh" />
         </div>
-        <div class="form-field">
-          <label>Full Address *</label>
-          <!-- Ghar ka pura address - makaan number, gali, mohalla -->
-          <input type="text" id="custAddress" placeholder="House No., Street, Mohalla" required />
-        </div>
-        <div class="form-row">
-          <div class="form-field">
-            <label>City *</label>
-            <!-- Apna sheher -->
-            <input type="text" id="custCity" placeholder="Lucknow" required />
-          </div>
-          <div class="form-field">
-            <label>State</label>
-            <!-- State/Pradesh ka naam -->
-            <input type="text" id="custState" placeholder="Uttar Pradesh" value="Uttar Pradesh" />
-          </div>
-        </div>
-        <div class="form-field">
-          <label>PIN Code *</label>
-          <!-- 6 digit PIN code daalo -->
-          <input type="text" id="custZip" placeholder="226001" maxlength="6" required />
-        </div>
-        <button type="button" class="btn-primary" style="width:100%" onclick="goToStep2()">
-          Continue <i class="fas fa-arrow-right"></i>
-        </button>
-      </form>
+      </div>
+      <div class="form-field">
+        <label>PIN Code *</label>
+        <input type="text" id="custZip" placeholder="226001" maxlength="6" required />
+      </div>
+      <!-- ✅ FIX: onclick hata diya -->
+      <button type="button" class="btn-primary" id="continueToOtpBtn" style="width:100%">
+        Continue <i class="fas fa-arrow-right"></i>
+      </button>
     </div>
 
     <!-- STEP 2: OTP Verification -->
@@ -502,25 +475,19 @@
         <div class="otp-icon">📱</div>
         <h4>WhatsApp OTP Verification</h4>
         <p id="otpSentMsg">Aapke WhatsApp pe OTP bheja ja raha hai...</p>
-
         <div class="otp-input-group">
-          <!-- 6 digit OTP jo WhatsApp pe aayega -->
           <input type="text" id="otpInput" placeholder="6-digit OTP" maxlength="6"
                  class="otp-input" inputmode="numeric" pattern="[0-9]*" />
         </div>
-
-        <button class="btn-primary" style="width:100%;margin-top:1rem" onclick="verifyOTP()">
+        <!-- ✅ FIX: onclick hata diya -->
+        <button class="btn-primary" id="verifyOtpBtn" style="width:100%;margin-top:1rem">
           <i class="fas fa-shield-alt"></i> Verify OTP
         </button>
-
         <div class="otp-resend">
           <span id="otpTimer">Resend in: <strong id="timerCount">60</strong>s</span>
-          <button class="resend-btn" id="resendBtn" onclick="resendOTP()" disabled>
-            Resend OTP
-          </button>
+          <!-- ✅ FIX: onclick hata diya -->
+          <button class="resend-btn" id="resendBtn" disabled>Resend OTP</button>
         </div>
-
-        <!-- DEV NOTE: Production mein yeh div remove kar dena -->
         <div id="devOtpHint" class="dev-hint" style="display:none">
           Dev Mode OTP: <strong id="devOtpVal"></strong>
         </div>
@@ -530,8 +497,6 @@
     <!-- STEP 3: Payment -->
     <div id="checkoutStep3" class="checkout-step">
       <h4 class="step-title">💳 Payment Method</h4>
-
-      <!-- Order Summary -->
       <div class="order-summary-box">
         <h5>Order Summary</h5>
         <div id="checkoutItemsList"></div>
@@ -543,7 +508,6 @@
         </div>
       </div>
 
-      <!-- Payment Options -->
       <div class="payment-options">
         <label class="payment-option active" id="codOption">
           <input type="radio" name="payment" value="COD" checked />
@@ -570,19 +534,19 @@
         </label>
       </div>
 
-      <!-- UPI QR (shown when UPI selected) -->
       <div id="upiSection" style="display:none" class="upi-box">
         <p>Neeche QR code scan karein:</p>
-        <img src="images/upiQRMAA.jpg" alt="UPI QR Code" class="upi-qr"
-             onerror="this.src='data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'200\' height=\'200\'><rect width=\'200\' height=\'200\' fill=\'%23f5f2e8\'/><text x=\'100\' y=\'100\' text-anchor=\'middle\' fill=\'%23d4af37\' font-size=\'14\'>QR Code</text></svg>'" />
+        <img src="images/upiQRMAA.jpg" alt="UPI QR Code" class="upi-qr" />
         <div class="upi-id">
-          <i class="fas fa-copy" onclick="copyUPI()"></i>
+          <!-- ✅ FIX: onclick hata diya -->
+          <i class="fas fa-copy" id="copyUpiBtn" style="cursor:pointer"></i>
           UPI ID: <strong id="upiIdText">paytmqr5x3t0n@ptys</strong>
         </div>
         <p class="upi-note">⚠️ Payment ke baad screenshot save kar lein</p>
       </div>
 
-      <button class="btn-primary" style="width:100%;margin-top:1.5rem" id="placeOrderBtn" onclick="placeOrder()">
+      <!-- ✅ FIX: onclick hata diya -->
+      <button class="btn-primary" style="width:100%;margin-top:1.5rem" id="placeOrderBtn">
         <i class="fas fa-lock"></i> Place Order Securely
       </button>
       <p class="secure-note"><i class="fas fa-shield-alt"></i> 100% Secure | OTP Verified</p>
@@ -604,7 +568,8 @@
       Order # <strong id="successOrderNum">--</strong>
     </div>
     <p class="success-note">✅ WhatsApp pe confirmation bhej diya gaya hai<br/>📧 Email bhi check karein</p>
-    <button class="btn-primary" onclick="closeSuccess()">
+    <!-- ✅ FIX: onclick hata diya -->
+    <button class="btn-primary" id="continueShoppingBtn">
       Continue Shopping
     </button>
   </div>
@@ -617,7 +582,8 @@
 </div>
 
 <!-- ========== BACK TO TOP ========== -->
-<button class="back-to-top" id="backToTop" onclick="window.scrollTo({top:0,behavior:'smooth'})" aria-label="Back to top">
+<!-- ✅ FIX: onclick hata diya -->
+<button class="back-to-top" id="backToTop" aria-label="Back to top">
   <i class="fas fa-arrow-up"></i>
 </button>
 
