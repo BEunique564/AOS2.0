@@ -1,12 +1,7 @@
 /**
  * AOS E-COMMERCE v2.0 - Frontend Script
  * Angelic Organic Spark
- * 
- * FIXES APPLIED:
- * 1. "Shop Collection" button - scrollToProducts() wired in DOMContentLoaded
- * 2. productsGrid fallback - agar ID match nahi toh bhi kaam kare
- * 3. Filter tabs "scrubs" -> "scrub" category match fix
- * 4. animateOnScroll - products render hone ke BAAD call hogi
+ * ✅ FIXED: Saare onclick HTML se hata diye — CSP ke saath compatible
  */
 
 // ============================================
@@ -25,8 +20,6 @@ const PRODUCTS = [
     category: "face-pack",
     badge: "bestseller",
     inventory: 50,
-    ingredients: ["Rose Extract", "Turmeric", "Neem", "Aloe Vera", "Sandalwood"],
-    benefits: ["Deep Cleansing", "Hydration", "Anti-aging", "Natural Glow"],
   },
   {
     id: "AOS-FP-050",
@@ -40,8 +33,6 @@ const PRODUCTS = [
     category: "face-pack",
     badge: null,
     inventory: 70,
-    ingredients: ["Rose Extract", "Turmeric", "Neem", "Aloe Vera", "Sandalwood"],
-    benefits: ["Deep Cleansing", "Hydration", "Anti-aging", "Natural Glow"],
   },
   {
     id: "AOS-FP-030",
@@ -55,8 +46,6 @@ const PRODUCTS = [
     category: "face-pack",
     badge: null,
     inventory: 100,
-    ingredients: ["Rose Extract", "Turmeric", "Neem", "Aloe Vera", "Sandalwood"],
-    benefits: ["Deep Cleansing", "Hydration", "Anti-aging", "Natural Glow"],
   },
   {
     id: "AOS-FP-020",
@@ -70,8 +59,6 @@ const PRODUCTS = [
     category: "face-pack",
     badge: "new",
     inventory: 120,
-    ingredients: ["Rose Extract", "Turmeric", "Neem", "Aloe Vera", "Sandalwood"],
-    benefits: ["Deep Cleansing", "Hydration", "Anti-aging", "Natural Glow"],
   },
   {
     id: "AOS-FS-120",
@@ -85,8 +72,6 @@ const PRODUCTS = [
     category: "scrub",
     badge: "bestseller",
     inventory: 80,
-    ingredients: ["Coffee Grounds", "Coconut Oil", "Brown Sugar", "Vitamin E", "Essential Oils"],
-    benefits: ["Gentle Exfoliation", "Dead Skin Remove", "Improves Texture", "Natural Radiance"],
   },
 ];
 
@@ -98,81 +83,47 @@ try { cart = JSON.parse(localStorage.getItem("aos_cart_v2")) || []; } catch { ca
 
 let verifyToken = null;
 let otpTimerInterval = null;
-let currentFilter = "all";
 
 // ============================================
-// ON LOAD — FIX #1: Sab kuch yahan wire karo
+// DOMContentLoaded — MAIN ENTRY POINT
 // ============================================
 document.addEventListener("DOMContentLoaded", () => {
-  // Products render karo
   renderProducts(PRODUCTS);
-
-  // Cart count update karo
   updateCartCount();
-
-  // Sabhi event listeners lagao
-  setupListeners();
-
-  // ✅ FIX #1: "Shop Collection" button ko scrollToProducts se connect karo
-  // Multiple selectors try karte hain kyunki HTML mein button ka exact class/ID
-  // alag ho sakta hai
-  const shopBtns = document.querySelectorAll(
-    '.hero-btn, .shop-btn, [onclick*="scrollToProducts"], a[href="#products"]'
-  );
-  shopBtns.forEach(btn => {
-    // Sirf woh button jo "Shop" ya "Collection" text contain kare
-    if (btn.textContent.toLowerCase().includes("shop") ||
-        btn.textContent.toLowerCase().includes("collection")) {
-      btn.removeAttribute("href"); // href="#" se page jump rokein
-      btn.style.cursor = "pointer";
-      btn.addEventListener("click", (e) => {
-        e.preventDefault();
-        scrollToProducts();
-      });
-    }
-  });
-
-  // Animate on scroll (products render ke BAAD)
-  animateOnScroll();
+  setupAllListeners();
+  setupScrollAnimations();
 });
 
 // ============================================
-// RENDER PRODUCTS — FIX #2: Grid ID fallback
+// RENDER PRODUCTS
 // ============================================
 function renderProducts(list) {
-  // ✅ FIX #2: Pehle "productsGrid" try karo, nahi mila toh dusre IDs try karo
-  let grid = document.getElementById("productsGrid");
-  
-  if (!grid) grid = document.getElementById("products-grid");
-  if (!grid) grid = document.querySelector(".products-grid");
-  if (!grid) grid = document.querySelector("#products .grid");
-  if (!grid) grid = document.querySelector("#products > div");
-
-  if (!grid) {
-    console.error("❌ Products grid element nahi mila! HTML mein id='productsGrid' wala div check karo.");
-    return;
-  }
+  const grid = document.getElementById("productsGrid");
+  if (!grid) return;
 
   if (list.length === 0) {
-    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:3rem;color:var(--text-muted);">
-      <i class="fas fa-box-open" style="font-size:3rem;margin-bottom:1rem;display:block;"></i>
-      <p>Koi product nahi mila is category mein</p>
-    </div>`;
+    grid.innerHTML = `
+      <div style="grid-column:1/-1;text-align:center;padding:3rem;color:#888;">
+        <i class="fas fa-box-open" style="font-size:3rem;margin-bottom:1rem;display:block;"></i>
+        <p>Koi product nahi mila is category mein</p>
+      </div>`;
     return;
   }
 
   grid.innerHTML = list.map(p => {
     const discount = Math.round(((p.mrp - p.price) / p.mrp) * 100);
     const badgeHtml = p.badge
-      ? `<div class="product-badge ${p.badge === "bestseller" ? "bestseller" : ""}">${p.badge === "bestseller" ? "⭐ Bestseller" : p.badge.toUpperCase()}</div>`
+      ? `<div class="product-badge ${p.badge === "bestseller" ? "bestseller" : ""}">
+           ${p.badge === "bestseller" ? "⭐ Bestseller" : p.badge.toUpperCase()}
+         </div>`
       : "";
 
     return `
       <div class="product-card" data-category="${p.category}" data-id="${p.id}">
         <div class="product-img-wrap">
           ${badgeHtml}
-          <img src="${p.image}" alt="${p.name}"
-               onerror="this.src='data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'300\' height=\'300\'><rect width=\'300\' height=\'300\' fill=\'%23fdf8ec\'/><text x=\'150\' y=\'150\' text-anchor=\'middle\' dominant-baseline=\'middle\' fill=\'%23d4af37\' font-size=\'40\'>🌿</text></svg>'" />
+          <img src="${p.image}" alt="${p.name}" loading="lazy"
+               onerror="this.onerror=null;this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'300\' height=\'300\'%3E%3Crect width=\'300\' height=\'300\' fill=\'%23fdf8ec\'/%3E%3Ctext x=\'150\' y=\'150\' text-anchor=\'middle\' dominant-baseline=\'middle\' fill=\'%23d4af37\' font-size=\'60\'%3E🌿%3C/text%3E%3C/svg%3E'" />
         </div>
         <div class="product-info">
           <span class="product-category">${p.category.replace("-", " ")}</span>
@@ -187,7 +138,7 @@ function renderProducts(list) {
             <select class="size-select" id="sz-${p.id}">
               ${p.sizes.map(s => `<option value="${s}">${s}</option>`).join("")}
             </select>
-            <button class="add-cart-btn" onclick="addToCart('${p.id}')" id="btn-${p.id}">
+            <button class="add-cart-btn" data-product-id="${p.id}" id="btn-${p.id}">
               <i class="fas fa-shopping-bag"></i> Add to Cart
             </button>
           </div>
@@ -195,6 +146,14 @@ function renderProducts(list) {
       </div>
     `;
   }).join("");
+
+  // ✅ Add to Cart buttons ke event listeners — render ke baad attach karo
+  grid.querySelectorAll(".add-cart-btn").forEach(btn => {
+    btn.addEventListener("click", () => addToCart(btn.dataset.productId));
+  });
+
+  // Scroll animations re-apply
+  setupScrollAnimations();
 }
 
 // ============================================
@@ -211,14 +170,20 @@ function addToCart(productId) {
   if (existing) {
     existing.quantity += 1;
   } else {
-    cart.push({ id: productId, name: product.shortName, price: product.price, size, quantity: 1, image: product.image });
+    cart.push({
+      id: productId,
+      name: product.shortName,
+      price: product.price,
+      size,
+      quantity: 1,
+      image: product.image,
+    });
   }
 
   saveCart();
   updateCartCount();
   showToast(`${product.shortName} cart mein add ho gaya! 🛍️`);
 
-  // Animate button
   const btn = document.getElementById(`btn-${productId}`);
   if (btn) {
     btn.innerHTML = '<i class="fas fa-check"></i> Added!';
@@ -251,10 +216,7 @@ function saveCart() {
 
 function updateCartCount() {
   const total = cart.reduce((s, i) => s + i.quantity, 0);
-  // ✅ FIX: Multiple selectors try karo cart count ke liye
-  const el = document.getElementById("cartCount") ||
-             document.querySelector(".cart-count") ||
-             document.querySelector("[data-cart-count]");
+  const el = document.getElementById("cartCount");
   if (el) el.textContent = total;
 }
 
@@ -288,12 +250,17 @@ function renderCartDrawer() {
   if (cart.length === 0) {
     container.innerHTML = `
       <div class="cart-empty">
-        <i class="fas fa-shopping-bag"></i>
+        <i class="fas fa-shopping-bag" style="font-size:3rem;color:#d4af37;margin-bottom:1rem;"></i>
         <p>Aapka cart khaali hai</p>
-        <button class="btn-primary" onclick="closeCartDrawer(); scrollToProducts()">
+        <button class="btn-primary" id="cartShopNowBtn" style="margin-top:1rem">
           <i class="fas fa-arrow-left"></i> Shop Now
         </button>
       </div>`;
+    // Shop Now button inside empty cart
+    document.getElementById("cartShopNowBtn")?.addEventListener("click", () => {
+      closeCartDrawer();
+      scrollToProducts();
+    });
     if (footer) footer.style.display = "none";
     return;
   }
@@ -301,22 +268,30 @@ function renderCartDrawer() {
   container.innerHTML = cart.map(item => `
     <div class="cart-item-row">
       <img class="cart-item-img" src="${item.image}" alt="${item.name}"
-           onerror="this.src='data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'72\' height=\'72\'><rect width=\'72\' height=\'72\' fill=\'%23fdf8ec\'/><text x=\'36\' y=\'36\' text-anchor=\'middle\' dominant-baseline=\'middle\' fill=\'%23d4af37\' font-size=\'24\'>🌿</text></svg>'" />
+           onerror="this.onerror=null;this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'72\' height=\'72\'%3E%3Crect width=\'72\' height=\'72\' fill=\'%23fdf8ec\'/%3E%3Ctext x=\'36\' y=\'36\' text-anchor=\'middle\' dominant-baseline=\'middle\' fill=\'%23d4af37\' font-size=\'24\'%3E🌿%3C/text%3E%3C/svg%3E'" />
       <div class="cart-item-details">
         <div class="cart-item-name">${item.name}</div>
         <div class="cart-item-size">${item.size}</div>
         <div class="cart-item-price">₹${(item.price * item.quantity).toFixed(0)}</div>
         <div class="qty-controls">
-          <button class="qty-btn" onclick="updateQty('${item.id}','${item.size}',-1)">−</button>
+          <button class="qty-btn" data-id="${item.id}" data-size="${item.size}" data-delta="-1">−</button>
           <span class="qty-num">${item.quantity}</span>
-          <button class="qty-btn" onclick="updateQty('${item.id}','${item.size}',1)">+</button>
-          <button class="cart-item-remove" onclick="removeFromCart('${item.id}','${item.size}')">
+          <button class="qty-btn" data-id="${item.id}" data-size="${item.size}" data-delta="1">+</button>
+          <button class="cart-item-remove" data-id="${item.id}" data-size="${item.size}">
             <i class="fas fa-trash-alt"></i> Remove
           </button>
         </div>
       </div>
     </div>
   `).join("");
+
+  // ✅ Qty + Remove buttons ke event listeners
+  container.querySelectorAll(".qty-btn").forEach(btn => {
+    btn.addEventListener("click", () => updateQty(btn.dataset.id, btn.dataset.size, parseInt(btn.dataset.delta)));
+  });
+  container.querySelectorAll(".cart-item-remove").forEach(btn => {
+    btn.addEventListener("click", () => removeFromCart(btn.dataset.id, btn.dataset.size));
+  });
 
   const { subtotal, shipping, total } = calcTotals();
   document.getElementById("cartSubtotal").textContent = `₹${subtotal}`;
@@ -400,7 +375,6 @@ async function sendOTP(phone) {
         document.getElementById("devOtpHint").style.display = "block";
         document.getElementById("devOtpVal").textContent = data.devOtp;
       }
-
       startOTPTimer();
     } else {
       showToast(data.error || "OTP send nahi hua", "error");
@@ -412,26 +386,24 @@ async function sendOTP(phone) {
   }
 }
 
-async function resendOTP() {
-  const phone = document.getElementById("custPhone").value.trim();
-  document.getElementById("resendBtn").disabled = true;
-  await sendOTP(phone);
-}
-
 function startOTPTimer() {
   let seconds = 60;
   clearInterval(otpTimerInterval);
-  document.getElementById("timerCount").textContent = seconds;
-  document.getElementById("resendBtn").disabled = true;
-  document.getElementById("otpTimer").style.display = "inline";
+  const timerEl = document.getElementById("timerCount");
+  const resendBtn = document.getElementById("resendBtn");
+  const otpTimer = document.getElementById("otpTimer");
+
+  if (timerEl) timerEl.textContent = seconds;
+  if (resendBtn) resendBtn.disabled = true;
+  if (otpTimer) otpTimer.style.display = "inline";
 
   otpTimerInterval = setInterval(() => {
     seconds--;
-    document.getElementById("timerCount").textContent = seconds;
+    if (timerEl) timerEl.textContent = seconds;
     if (seconds <= 0) {
       clearInterval(otpTimerInterval);
-      document.getElementById("otpTimer").style.display = "none";
-      document.getElementById("resendBtn").disabled = false;
+      if (otpTimer) otpTimer.style.display = "none";
+      if (resendBtn) resendBtn.disabled = false;
     }
   }, 1000);
 }
@@ -477,20 +449,13 @@ function fillOrderSummary() {
       </div>`
     ).join("");
   }
-  document.getElementById("checkoutSubtotal").textContent = `₹${subtotal}`;
-  document.getElementById("checkoutShipping").textContent = shipping === 0 ? "FREE 🎉" : `₹${shipping}`;
-  document.getElementById("checkoutTotal").textContent = `₹${total}`;
+  const sub = document.getElementById("checkoutSubtotal");
+  const ship = document.getElementById("checkoutShipping");
+  const tot = document.getElementById("checkoutTotal");
+  if (sub) sub.textContent = `₹${subtotal}`;
+  if (ship) ship.textContent = shipping === 0 ? "FREE 🎉" : `₹${shipping}`;
+  if (tot) tot.textContent = `₹${total}`;
 }
-
-document.addEventListener("click", (e) => {
-  const opt = e.target.closest(".payment-option");
-  if (!opt) return;
-  document.querySelectorAll(".payment-option").forEach(o => o.classList.remove("active"));
-  opt.classList.add("active");
-  opt.querySelector('input[type="radio"]').checked = true;
-  const val = opt.querySelector('input').value;
-  document.getElementById("upiSection").style.display = val === "UPI" ? "block" : "none";
-});
 
 async function placeOrder() {
   if (!verifyToken) { showToast("Pehle OTP verify karein", "error"); return; }
@@ -533,9 +498,9 @@ async function placeOrder() {
       saveCart();
       updateCartCount();
       verifyToken = null;
-
       closeCheckout();
-      document.getElementById("successOrderNum").textContent = data.orderNumber;
+      const numEl = document.getElementById("successOrderNum");
+      if (numEl) numEl.textContent = data.orderNumber;
       document.getElementById("successOverlay").classList.add("open");
     } else {
       showToast(data.error || "Order fail hua. Try again.", "error");
@@ -563,8 +528,7 @@ async function handleContactForm(e) {
   btn.innerHTML = '<span class="spinner"></span> Sending...';
   btn.disabled = true;
 
-  const formData = new FormData(e.target);
-  const data = Object.fromEntries(formData);
+  const data = Object.fromEntries(new FormData(e.target));
 
   try {
     const res = await fetch("/api/contact", {
@@ -589,52 +553,10 @@ async function handleContactForm(e) {
 }
 
 // ============================================
-// FILTER TABS — FIX #3: "scrubs" -> "scrub" match
-// ============================================
-function setupFilterTabs() {
-  document.querySelectorAll(".filter-tab").forEach(tab => {
-    tab.addEventListener("click", () => {
-      document.querySelectorAll(".filter-tab").forEach(t => t.classList.remove("active"));
-      tab.classList.add("active");
-
-      // ✅ FIX #3: data-filter value ko normalize karo
-      // HTML mein "scrubs" hoga lekin PRODUCTS mein category "scrub" hai
-      const rawFilter = tab.dataset.filter;
-      currentFilter = rawFilter;
-
-      let filtered;
-      if (rawFilter === "all") {
-        filtered = PRODUCTS;
-      } else {
-        filtered = PRODUCTS.filter(p => {
-          // Exact match ya partial match dono try karo
-          return p.category === rawFilter ||
-                 p.category === rawFilter.replace(/s$/, "") || // "scrubs" -> "scrub"
-                 p.category.includes(rawFilter) ||
-                 rawFilter.includes(p.category);
-        });
-      }
-
-      renderProducts(filtered);
-
-      // Re-apply animations naye render ke baad
-      setTimeout(() => animateOnScroll(), 100);
-    });
-  });
-}
-
-// ============================================
 // UTILITY
 // ============================================
 function scrollToProducts() {
-  const el = document.getElementById("products");
-  if (el) {
-    el.scrollIntoView({ behavior: "smooth" });
-  } else {
-    // Fallback: products section dhundo
-    const section = document.querySelector("section.products, .products-section, [data-section='products']");
-    if (section) section.scrollIntoView({ behavior: "smooth" });
-  }
+  document.getElementById("products")?.scrollIntoView({ behavior: "smooth" });
 }
 
 function showToast(msg, type = "success") {
@@ -643,71 +565,66 @@ function showToast(msg, type = "success") {
   const msgEl = document.getElementById("toastMsg");
   if (!toast) return;
 
-  icon.className = type === "error" ? "fas fa-exclamation-circle" : "fas fa-check-circle";
-  toast.style.background = type === "error" ? "var(--error)" : "var(--brown)";
-  msgEl.textContent = msg;
+  if (icon) icon.className = type === "error" ? "fas fa-exclamation-circle" : "fas fa-check-circle";
+  toast.style.background = type === "error" ? "#e53e3e" : "#7c4b2a";
+  if (msgEl) msgEl.textContent = msg;
   toast.classList.add("show");
   setTimeout(() => toast.classList.remove("show"), 3000);
 }
 
 function copyUPI() {
   const upiId = document.getElementById("upiIdText")?.textContent;
-  if (upiId) {
-    navigator.clipboard.writeText(upiId).then(() => showToast("UPI ID copied! ✓"));
-  }
+  if (upiId) navigator.clipboard.writeText(upiId).then(() => showToast("UPI ID copied! ✓"));
 }
 
-function showPolicy(type) {
-  const policies = {
-    shipping: "🚚 Shipping Policy\n\n• ₹499+ ke orders pe FREE shipping\n• ₹499 se kam pe ₹50 delivery charge\n• 3-5 business days mein delivery\n• Lucknow area mein 1-2 din",
-    return: "↩️ Return Policy\n\n• 7 din ki return policy\n• Damaged ya wrong product pe full refund\n• Sealed product wapas karna zaroori hai\n• Return ke liye WhatsApp karein",
-    privacy: "🔒 Privacy Policy\n\n• Aapka data sirf order fulfillment ke liye use hoga\n• Kisi bhi third party ko data nahi diya jayega\n• Payment details secure server pe process hoti hain",
-    terms: "📋 Terms of Service\n\n• Sabhi orders OTP verification ke baad confirm hote hain\n• COD orders mein delivery pe cash ready rakhein\n• Prices bina notice ke change ho sakti hain",
-  };
-  alert(policies[type] || "Information unavailable");
-}
+const POLICIES = {
+  shipping: "🚚 Shipping Policy\n\n• ₹499+ ke orders pe FREE shipping\n• ₹499 se kam pe ₹50 delivery charge\n• 3-5 business days mein delivery\n• Lucknow area mein 1-2 din",
+  return: "↩️ Return Policy\n\n• 7 din ki return policy\n• Damaged ya wrong product pe full refund\n• Sealed product wapas karna zaroori hai\n• Return ke liye WhatsApp karein",
+  privacy: "🔒 Privacy Policy\n\n• Aapka data sirf order fulfillment ke liye use hoga\n• Kisi bhi third party ko data nahi diya jayega\n• Payment details secure server pe process hoti hain",
+  terms: "📋 Terms of Service\n\n• Sabhi orders OTP verification ke baad confirm hote hain\n• COD orders mein delivery pe cash ready rakhein\n• Prices bina notice ke change ho sakti hain",
+};
 
 // ============================================
 // SCROLL ANIMATIONS
 // ============================================
-function animateOnScroll() {
-  // Pehle se visible class ka style add karo agar nahi hai
-  if (!document.getElementById("aos-visible-style")) {
+function setupScrollAnimations() {
+  if (!document.getElementById("aos-anim-style")) {
     const style = document.createElement("style");
-    style.id = "aos-visible-style";
-    style.textContent = ".visible { opacity: 1 !important; transform: translateY(0) !important; }";
+    style.id = "aos-anim-style";
+    style.textContent = ".anim-hidden{opacity:0;transform:translateY(24px);transition:opacity .5s ease,transform .5s ease}.anim-visible{opacity:1!important;transform:translateY(0)!important}";
     document.head.appendChild(style);
   }
 
   const observer = new IntersectionObserver(
-    (entries) => entries.forEach(e => { if (e.isIntersecting) e.target.classList.add("visible"); }),
+    entries => entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add("anim-visible");
+        observer.unobserve(e.target);
+      }
+    }),
     { threshold: 0.1 }
   );
 
-  document.querySelectorAll(".product-card, .feature-card, .step-card, .testimonial-card").forEach(el => {
-    // Already visible class nahi hai toh animate karo
-    if (!el.classList.contains("visible")) {
-      el.style.opacity = "0";
-      el.style.transform = "translateY(20px)";
-      el.style.transition = "opacity .5s ease, transform .5s ease";
-      observer.observe(el);
-    }
+  document.querySelectorAll(
+    ".product-card:not(.anim-hidden), .feature-card, .step-card, .testimonial-card"
+  ).forEach(el => {
+    el.classList.add("anim-hidden");
+    observer.observe(el);
   });
 }
 
 // ============================================
-// EVENT LISTENERS
+// ✅ ALL EVENT LISTENERS — EK JAGAH
 // ============================================
-function setupListeners() {
-  // Hamburger menu
+function setupAllListeners() {
+
+  // --- Hamburger ---
   const hamburger = document.getElementById("hamburger");
   const navMenu = document.getElementById("navMenu");
   hamburger?.addEventListener("click", () => {
     hamburger.classList.toggle("open");
-    navMenu.classList.toggle("open");
+    navMenu?.classList.toggle("open");
   });
-
-  // Close nav on link click
   document.querySelectorAll(".nav-link").forEach(link => {
     link.addEventListener("click", () => {
       hamburger?.classList.remove("open");
@@ -715,35 +632,113 @@ function setupListeners() {
     });
   });
 
-  // Cart
+  // --- Shop Collection button ---
+  document.getElementById("shopCollectionBtn")?.addEventListener("click", scrollToProducts);
+
+  // --- Cart ---
   document.getElementById("cartBtn")?.addEventListener("click", openCartDrawer);
   document.getElementById("closeCart")?.addEventListener("click", closeCartDrawer);
   document.getElementById("cartOverlay")?.addEventListener("click", closeCartDrawer);
+  document.getElementById("checkoutBtn")?.addEventListener("click", openCheckout);
 
-  // Checkout overlay click outside
+  // --- Checkout modal ---
+  document.getElementById("closeCheckoutBtn")?.addEventListener("click", closeCheckout);
   document.getElementById("checkoutOverlay")?.addEventListener("click", (e) => {
     if (e.target === e.currentTarget) closeCheckout();
   });
 
-  // Success overlay click outside
+  // --- Checkout steps ---
+  document.getElementById("continueToOtpBtn")?.addEventListener("click", goToStep2);
+  document.getElementById("verifyOtpBtn")?.addEventListener("click", verifyOTP);
+  document.getElementById("resendBtn")?.addEventListener("click", async () => {
+    const phone = document.getElementById("custPhone").value.trim();
+    document.getElementById("resendBtn").disabled = true;
+    await sendOTP(phone);
+  });
+
+  // --- Place Order ---
+  document.getElementById("placeOrderBtn")?.addEventListener("click", placeOrder);
+
+  // --- Success modal ---
+  document.getElementById("continueShoppingBtn")?.addEventListener("click", closeSuccess);
   document.getElementById("successOverlay")?.addEventListener("click", (e) => {
     if (e.target === e.currentTarget) closeSuccess();
   });
 
-  // Contact form
+  // --- Back to Top ---
+  document.getElementById("backToTop")?.addEventListener("click", () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+
+  // --- UPI Copy ---
+  document.getElementById("copyUpiBtn")?.addEventListener("click", copyUPI);
+
+  // --- Policy links ---
+  document.querySelectorAll(".policy-link").forEach(link => {
+    link.addEventListener("click", (e) => {
+      e.preventDefault();
+      const type = link.dataset.policy;
+      alert(POLICIES[type] || "Information unavailable");
+    });
+  });
+
+  // --- Payment option toggle ---
+  document.querySelectorAll(".payment-option").forEach(opt => {
+    opt.addEventListener("click", () => {
+      document.querySelectorAll(".payment-option").forEach(o => o.classList.remove("active"));
+      opt.classList.add("active");
+      const radio = opt.querySelector('input[type="radio"]');
+      if (radio) radio.checked = true;
+      const val = radio?.value;
+      const upiSection = document.getElementById("upiSection");
+      if (upiSection) upiSection.style.display = val === "UPI" ? "block" : "none";
+    });
+  });
+
+  // --- Filter Tabs ---
+  document.querySelectorAll(".filter-tab").forEach(tab => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".filter-tab").forEach(t => t.classList.remove("active"));
+      tab.classList.add("active");
+      const filter = tab.dataset.filter;
+      const filtered = filter === "all" ? PRODUCTS : PRODUCTS.filter(p => p.category === filter);
+      renderProducts(filtered);
+    });
+  });
+
+  // --- Contact Form ---
   document.getElementById("contactForm")?.addEventListener("submit", handleContactForm);
 
-  // Filter tabs
-  setupFilterTabs();
+  // --- OTP input: only numbers ---
+  document.getElementById("otpInput")?.addEventListener("input", (e) => {
+    e.target.value = e.target.value.replace(/\D/g, "");
+  });
+  document.getElementById("otpInput")?.addEventListener("keypress", (e) => {
+    if (e.key === "Enter") verifyOTP();
+  });
 
-  // ✅ Scroll: header + back to top
+  // --- Phone: only numbers, max 10 ---
+  document.getElementById("custPhone")?.addEventListener("input", (e) => {
+    e.target.value = e.target.value.replace(/\D/g, "").slice(0, 10);
+  });
+
+  // --- ZIP: only numbers, max 6 ---
+  document.getElementById("custZip")?.addEventListener("input", (e) => {
+    e.target.value = e.target.value.replace(/\D/g, "").slice(0, 6);
+  });
+
+  // --- ESC closes modals ---
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { closeCartDrawer(); closeCheckout(); closeSuccess(); }
+  });
+
+  // --- Scroll: header + back to top + active nav ---
   window.addEventListener("scroll", () => {
     const header = document.getElementById("header");
     const backToTop = document.getElementById("backToTop");
     if (header) header.classList.toggle("scrolled", window.scrollY > 50);
     if (backToTop) backToTop.classList.toggle("visible", window.scrollY > 400);
 
-    // Active nav link highlight
     const sections = ["home", "products", "about", "contact"];
     let current = "";
     sections.forEach(id => {
@@ -753,34 +748,5 @@ function setupListeners() {
     document.querySelectorAll(".nav-link").forEach(link => {
       link.classList.toggle("active", link.getAttribute("href") === `#${current}`);
     });
-  });
-
-  // OTP input - only numbers
-  document.getElementById("otpInput")?.addEventListener("input", (e) => {
-    e.target.value = e.target.value.replace(/\D/g, "");
-  });
-
-  // Phone input - only numbers, max 10 digits
-  document.getElementById("custPhone")?.addEventListener("input", (e) => {
-    e.target.value = e.target.value.replace(/\D/g, "").slice(0, 10);
-  });
-
-  // ZIP - only numbers, max 6 digits
-  document.getElementById("custZip")?.addEventListener("input", (e) => {
-    e.target.value = e.target.value.replace(/\D/g, "").slice(0, 6);
-  });
-
-  // Enter key on OTP field
-  document.getElementById("otpInput")?.addEventListener("keypress", (e) => {
-    if (e.key === "Enter") verifyOTP();
-  });
-
-  // ESC key closes all modals
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") {
-      closeCartDrawer();
-      closeCheckout();
-      closeSuccess();
-    }
   });
 }
